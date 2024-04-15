@@ -323,7 +323,7 @@ void isp_pipe_task_get_stats_result(struct k1xisp_pipe_dev *pipe_dev,
 
 	for_each_set_bit(set_bit, &pipe_task->stat_bitmap, ISP_STAT_ID_MAX) {
 		if (set_bit > ISP_STAT_ID_MAX) {
-			//slave pipe stat, HDR never happen on dove.
+			//slave pipe stat
 			if (pipe_dev->stats_node_cnt < 2) {
 				isp_log_err
 				    ("fatal error:stat bitmap use slave pipe, but stat node count is %d!",

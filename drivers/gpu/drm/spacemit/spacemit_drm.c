@@ -40,7 +40,7 @@ void spacemit_drm_atomic_commit_tail(struct drm_atomic_state *old_state)
 	drm_atomic_helper_commit_planes(dev, old_state,
 					DRM_PLANE_COMMIT_ACTIVE_ONLY);
 
-	spacemit_wb_atomic_commit(dev, old_state);
+	// spacemit_wb_atomic_commit(dev, old_state);
 
 	drm_atomic_helper_wait_for_flip_done(dev, old_state);
 
@@ -484,7 +484,6 @@ static struct platform_driver * const spacemit_drm_drivers[] = {
 	&spacemit_drm_driver,
 	&spacemit_dpu_driver,
 	&spacemit_dsi_driver,
-	&spacemit_wb_driver,
 	&spacemit_dphy_driver,
 };
 
@@ -516,7 +515,7 @@ static void __exit spacemit_drm_drivers_exit(void)
 				    ARRAY_SIZE(spacemit_drm_drivers));
 }
 
-late_initcall(spacemit_drm_drivers_init);
+module_init(spacemit_drm_drivers_init);
 module_exit(spacemit_drm_drivers_exit);
 
 MODULE_DESCRIPTION("Spacemit DRM KMS Master Driver");

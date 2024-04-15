@@ -954,6 +954,12 @@ static irqreturn_t spacemit_i2c_int_handler(int irq, void *devid)
 	status = spacemit_i2c_read_reg(spacemit_i2c, REG_SR);
 	spacemit_i2c->i2c_status = status;
 
+	/* check if a valid interrupt status */
+	if(!status) {
+		/* nothing need be done */
+		return IRQ_HANDLED;
+	}
+
 #ifdef CONFIG_I2C_SLAVE
 	if (spacemit_i2c->slave) {
 		spacemit_i2c_slave_handler(spacemit_i2c);
@@ -1616,47 +1622,46 @@ static const struct file_operations spacemit_i2c_dbgfs_ops = {
 #endif /* CONFIG_DEBUG_FS */
 
 #ifdef CONFIG_PM_SLEEP
-static int spacemit_i2c_suspend(struct device *dev)
-{
-	struct spacemit_i2c_dev *spacemit_i2c = dev_get_drvdata(dev);
-
-	dev_dbg(spacemit_i2c->dev, "system suspend\n");
-
-	if (spacemit_i2c->clk_always_on)
-		return 0;
-
-	/* grab mutex to make sure the i2c transaction is over */
-	mutex_lock(&spacemit_i2c->mtx);
-	if (!pm_runtime_status_suspended(dev)) {
-		spacemit_i2c_pm_runtime_suspend(dev);
-
-		/*
-		 * sync runtime pm and system pm states:
-		 * prevent runtime pm suspend callback from being re-invoked
-		 */
-		pm_runtime_disable(dev);
-		pm_runtime_set_suspended(dev);
-		pm_runtime_enable(dev);
-	}
-	mutex_unlock(&spacemit_i2c->mtx);
-
-	return 0;
-}
-
-static int spacemit_i2c_resume(struct device *dev)
-{
-	struct spacemit_i2c_dev *spacemit_i2c = dev_get_drvdata(dev);
-
-	dev_dbg(spacemit_i2c->dev, "system resume\n");
-
-	return 0;
-}
+/** static int spacemit_i2c_suspend(struct device *dev)
+ * {
+ *	struct spacemit_i2c_dev *spacemit_i2c = dev_get_drvdata(dev);
+ *
+ *	dev_dbg(spacemit_i2c->dev, "system suspend\n");
+ *
+ *	if (spacemit_i2c->clk_always_on)
+ *		return 0;
+ *
+ *	// grab mutex to make sure the i2c transaction is over
+ *	mutex_lock(&spacemit_i2c->mtx);
+ *	if (!pm_runtime_status_suspended(dev)) {
+ *		 // sync runtime pm and system pm states:
+ *		 // prevent runtime pm suspend callback from being re-invoked
+ *		pm_runtime_disable(dev);
+ *		pm_runtime_set_suspended(dev);
+ *		pm_runtime_enable(dev);
+ *	}
+ *	mutex_unlock(&spacemit_i2c->mtx);
+ *
+ *	return 0;
+ * }
+ *
+ * static int spacemit_i2c_resume(struct device *dev)
+ * {
+ *	struct spacemit_i2c_dev *spacemit_i2c = dev_get_drvdata(dev);
+ *
+ *	dev_dbg(spacemit_i2c->dev, "system resume\n");
+ *
+ *	return 0;
+ *}
+ */
 #endif /* CONFIG_PM_SLEEP */
 
-static const struct dev_pm_ops spacemit_i2c_pm_ops = {
-	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(spacemit_i2c_suspend,
-			spacemit_i2c_resume)
-};
+/**
+ * static const struct dev_pm_ops spacemit_i2c_pm_ops = {
+ *	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(spacemit_i2c_suspend,
+ *			spacemit_i2c_resume)
+ *};
+ */
 
 static u32 spacemit_i2c_func(struct i2c_adapter *adap)
 {
@@ -1836,11 +1841,14 @@ static int spacemit_i2c_probe(struct platform_device *pdev)
 	mutex_init(&spacemit_i2c->mtx);
 
 	spacemit_i2c->resets = devm_reset_control_get_optional(&pdev->dev, NULL);
-        if(IS_ERR(spacemit_i2c->resets)) {
-                dev_err(&pdev->dev, "failed to get resets\n");
-                goto err_out;
-        }
-        reset_control_deassert(spacemit_i2c->resets);
+	if(IS_ERR(spacemit_i2c->resets)) {
+		dev_err(&pdev->dev, "failed to get resets\n");
+		goto err_out;
+	}
+	/* reset the i2c controller */
+	reset_control_assert(spacemit_i2c->resets);
+	udelay(200);
+	reset_control_deassert(spacemit_i2c->resets);
 
 	ret = spacemit_i2c_parse_dt(pdev, spacemit_i2c);
 	if (ret)
@@ -2015,9 +2023,9 @@ static struct platform_driver spacemit_i2c_driver = {
 	.remove = spacemit_i2c_remove,
 	.shutdown = spacemit_i2c_shutdown,
 	.driver = {
-		.name           = "i2c-spacemit-k1x",
-		.pm             = &spacemit_i2c_pm_ops,
-		.of_match_table = spacemit_i2c_dt_match,
+		.name		= "i2c-spacemit-k1x",
+		/* .pm             = &spacemit_i2c_pm_ops, */
+		.of_match_table	= spacemit_i2c_dt_match,
 	},
 };
 

@@ -44,6 +44,7 @@
 #define CONFIG_SPACEMIT_WATCHDOG_ATBOOT		(0)
 /* default timeout is 60s */
 #define CONFIG_SPACEMIT_WATCHDOG_DEFAULT_TIME	(60)
+#define SPACEMIT_WATCHDOG_MAX_TIMEOUT		(255)
 #define SPACEMIT_WATCHDOG_EXPIRE_TIME		(100)
 /* touch watchdog every 30s */
 #define SPACEMIT_WATCHDOG_FEED_TIMEOUT	(30)
@@ -170,12 +171,14 @@ static int spa_wdt_set_timeout(struct watchdog_device *wdd, unsigned timeout)
 	 * the wdt timer is 16 bit,
 	 * frequence is 256HZ
 	 */
-	if ((long long)timeout > 0xffff) {
+	unsigned int tick = timeout << DEFAULT_SHIFT;
+	if ((long long)tick > 0xffff) {
 		dev_info(info->dev, "use default value!\n");
-		timeout = CONFIG_SPACEMIT_WATCHDOG_DEFAULT_TIME;
+		timeout = SPACEMIT_WATCHDOG_MAX_TIMEOUT;
+		tick = timeout << DEFAULT_SHIFT;
 	}
 
-	spa_wdt_write(info, WDT_WMR, timeout);
+	spa_wdt_write(info, WDT_WMR, tick);
 
 	wdd->timeout = timeout;
 
@@ -239,7 +242,7 @@ static int spa_wdt_start(struct watchdog_device *wdd)
 
 	/* set timeout = 100s */
 	spa_wdt_set_timeout(&info->wdt_dev,
-		(SPACEMIT_WATCHDOG_EXPIRE_TIME << DEFAULT_SHIFT));
+		SPACEMIT_WATCHDOG_EXPIRE_TIME);
 
 	/* enable counter and reset/interrupt */
 	spa_wdt_write(info, WDT_WMER, 0x3);
@@ -667,11 +670,11 @@ static int spa_wdt_probe(struct platform_device *pdev)
 	watchdog_set_nowayout(&spa_wdt, nowayout);
 
 	info->wdt_dev = spa_wdt;
-	/*ret = watchdog_register_device(&info->wdt_dev);
+	ret = watchdog_register_device(&info->wdt_dev);
 	if (ret) {
 		dev_err(info->dev, "cannot register watchdog (%d)\n", ret);
 		goto err_register_fail;
-	}*/
+	}
 
 	info->feed_timeout = ktime_set(SPACEMIT_WATCHDOG_FEED_TIMEOUT, 0);
 	hrtimer_init(&info->feed_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
@@ -715,8 +718,8 @@ err_alloc:
 		spa_wdt_stop(&info->wdt_dev);
 	}
 
-/*	watchdog_unregister_device(&info->wdt_dev);
-err_register_fail:*/
+	watchdog_unregister_device(&info->wdt_dev);
+err_register_fail:
 	spa_disable_wdt_clk(info);
 	clk_put(info->clk);
 

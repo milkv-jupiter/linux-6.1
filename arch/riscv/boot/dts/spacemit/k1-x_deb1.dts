@@ -6,10 +6,13 @@
 #include "k1-x.dtsi"
 #include "k1-x_pinctrl.dtsi"
 #include "lcd/lcd_gx09inx101_mipi.dtsi"
+#include "k1-x-hdmi.dtsi"
+#include "k1-x-lcd.dtsi"
 #include "k1-x-camera-sdk.dtsi"
 
 / {
 	model = "spacemit k1-x deb1 board";
+	modules_usrload = "8852bs";
 
 	cpus: cpus {
 		#address-cells = <1>;
@@ -102,15 +105,15 @@
 		};
 
 		/* reserved 384K for dpu, including mmu table(256K) and cmdlist(128K) */
-		dpu_resv: dpu_reserved@27000000 {
+		dpu_resv: dpu_reserved@2ff40000 {
 			compatible = "shared-dma-pool";
-			reg = <0x0 0x27000000 0x0 0x000C0000>;
+			reg = <0x0 0x2ff40000 0x0 0x000C0000>;
 			no-map;
 		};
 	};
 
 	chosen {
-		bootargs = "earlycon=sbi console=ttyS0,115200n8 debug loglevel=8,initcall_debug=1 clk_ignore_unused rdinit=/init.tmp";
+		bootargs = "earlycon=sbi console=ttyS0,115200n8 debug loglevel=8 swiotlb=65536 rdinit=/init";
 		stdout-path = "serial0:115200n8";
 	};
 
@@ -154,6 +157,18 @@
 			reset-gpios     = <&gpio 63 0>;
 		};
 	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led1 {
+			label = "sys-led";
+			gpios = <&gpio 96 0>;
+			linux,default-trigger = "heartbeat";
+			default-state = "on";
+			status = "okay";
+		};
+	};
 };
 
 &uart0 {
@@ -176,6 +191,7 @@
 
 &dpu_online2_dsi {
 	memory-region = <&dpu_resv>;
+	spacemit-dpu-bitclk = <1000000000>;
 	dsi_1v2-supply = <&ldo_5>;
 	vin-supply-names = "dsi_1v2";
 	status = "disabled";
@@ -246,6 +262,18 @@
 			reg = <0x6 6>;
 		};
 	};
+
+	es8326@19{
+		compatible = "everest,es8326";
+		reg = <0x19>;
+		#sound-dai-cells = <0>;
+		interrupt-parent = <&gpio>;
+		interrupts = <126 1>;
+		spk-ctl-gpio = <&gpio 127 0>;
+		everest,mic1-src = [44];
+		everest,mic2-src = [66];
+		status = "okay";
+	};
 };
 
 &i2c3 {
@@ -314,6 +342,7 @@
 				regulator-name = "dcdc1";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3450000>;
+				regulator-ramp-delay = <5000>;
 				regulator-always-on;
 			};
 
@@ -321,6 +350,7 @@
 				regulator-name = "dcdc2";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3450000>;
+				regulator-ramp-delay = <5000>;
 				regulator-always-on;
 			};
 
@@ -328,6 +358,7 @@
 				regulator-name = "dcdc3";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <1800000>;
+				regulator-ramp-delay = <5000>;
 				regulator-always-on;
 			};
 
@@ -335,6 +366,7 @@
 				regulator-name = "dcdc4";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3300000>;
+				regulator-ramp-delay = <5000>;
 				regulator-always-on;
 			};
 
@@ -342,6 +374,7 @@
 				regulator-name = "dcdc5";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3450000>;
+				regulator-ramp-delay = <5000>;
 				regulator-always-on;
 			};
 
@@ -349,6 +382,7 @@
 				regulator-name = "dcdc6";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3450000>;
+				regulator-ramp-delay = <5000>;
 				regulator-always-on;
 			};
 
@@ -469,13 +503,16 @@
 		&range GPIO_81  3 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_90  1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 		&range GPIO_91  2 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
-		&range DVL0     2 (MUX_MODE1 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
+		&range DVL0     1 (MUX_MODE1 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
+		&range DVL1     1 (MUX_MODE1 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS0)
 		&range GPIO_110 1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
+		&range GPIO_111 1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
+		&range GPIO_113 1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 		&range GPIO_114 1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 		&range GPIO_115 1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 		&range GPIO_116 1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_118 1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
-		&range GPIO_123 1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
+		&range GPIO_123 1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS0)
 		&range GPIO_124 1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_125 3 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 	>;
@@ -484,6 +521,48 @@
 		pinctrl-single,pins = <
 			K1X_PADCONF(GPIO_47,   MUX_MODE1, (EDGE_NONE | PULL_UP | PAD_3V_DS4))	/* r_uart0_tx */
 			K1X_PADCONF(GPIO_48,   MUX_MODE1, (EDGE_NONE | PULL_UP | PAD_3V_DS4))	/* r_uart0_rx */
+		>;
+	};
+
+	pinctrl_gmac0: gmac0_grp {
+		pinctrl-single,pins =<
+			K1X_PADCONF(GPIO_00,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac0_rxdv */
+			K1X_PADCONF(GPIO_01,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac0_rx_d0 */
+			K1X_PADCONF(GPIO_02,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac0_rx_d1 */
+			K1X_PADCONF(GPIO_03,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac0_rx_clk */
+			K1X_PADCONF(GPIO_04,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac0_rx_d2 */
+			K1X_PADCONF(GPIO_05,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac0_rx_d3 */
+			K1X_PADCONF(GPIO_06,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac0_tx_d0 */
+			K1X_PADCONF(GPIO_07,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac0_tx_d1 */
+			K1X_PADCONF(GPIO_08,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac0_tx */
+			K1X_PADCONF(GPIO_09,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac0_tx_d2 */
+			K1X_PADCONF(GPIO_10,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac0_tx_d3 */
+			K1X_PADCONF(GPIO_11,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac0_tx_en */
+			K1X_PADCONF(GPIO_12,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS0))   /* gmac0_mdc */
+			K1X_PADCONF(GPIO_13,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS0))   /* gmac0_mdio */
+			K1X_PADCONF(GPIO_14,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac0_int_n */
+			K1X_PADCONF(GPIO_45,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac0_clk_ref */
+		>;
+	};
+
+	pinctrl_gmac1: gmac1_grp {
+		pinctrl-single,pins =<
+			K1X_PADCONF(GPIO_29,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac1_rxdv */
+			K1X_PADCONF(GPIO_30,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac1_rx_d0 */
+			K1X_PADCONF(GPIO_31,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac1_rx_d1 */
+			K1X_PADCONF(GPIO_32,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac1_rx_clk */
+			K1X_PADCONF(GPIO_33,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac1_rx_d2 */
+			K1X_PADCONF(GPIO_34,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac1_rx_d3 */
+			K1X_PADCONF(GPIO_35,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS0))   /* gmac1_tx_d0 */
+			K1X_PADCONF(GPIO_36,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS0))   /* gmac1_tx_d1 */
+			K1X_PADCONF(GPIO_37,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac1_tx */
+			K1X_PADCONF(GPIO_38,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS0))   /* gmac1_tx_d2 */
+			K1X_PADCONF(GPIO_39,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS0))   /* gmac1_tx_d3 */
+			K1X_PADCONF(GPIO_40,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS0))   /* gmac1_tx_en */
+			K1X_PADCONF(GPIO_41,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS0))   /* gmac1_mdc */
+			K1X_PADCONF(GPIO_42,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS0))   /* gmac1_mdio */
+			K1X_PADCONF(GPIO_43,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac1_int_n */
+			K1X_PADCONF(GPIO_46,    MUX_MODE1, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))   /* gmac1_clk_ref */
 		>;
 	};
 };
@@ -499,6 +578,8 @@
 		&pinctrl 90  GPIO_90  3
 		&pinctrl 96  DVL0     2
 		&pinctrl 110 GPIO_110 1
+		&pinctrl 111 GPIO_111 1
+		&pinctrl 113 GPIO_113 1
 		&pinctrl 114 GPIO_114 3
 		&pinctrl 118 GPIO_118 1
 		&pinctrl 123 GPIO_123 5
@@ -536,7 +617,7 @@
 	spacemit,apbc_assar_reg = <0xD4015054>;
 	spacemit,rx_dline_reg = <0x0>;
 	spacemit,tx_dline_reg = <0x0>;
-	//spacemit,tx_delaycode = <0xA0>;
+	spacemit,tx_delaycode = <0x7f>;
 	spacemit,rx_tuning_limit = <50>;
 	spacemit,sdh-freq = <204800000>;
 	status = "okay";
@@ -547,16 +628,14 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_mmc2>;
 	bus-width = <4>;
+	non-removable;
 	vqmmc-supply = <&dcdc_3>;
 	no-mmc;
 	no-sd;
-	//mmc-pwrseq = <&sdio_pwrseq>;
 	keep-power-in-suspend;
 	/* bcmdhd use private oob solution rather than dat1/standard wakeup */
 	/delete-property/ enable-sdio-wakeup;
 	spacemit,sdh-host-caps-disable = <(
-			MMC_CAP_UHS_SDR104 |
-			MMC_CAP_UHS_SDR50 |
 			MMC_CAP_UHS_DDR50 |
 			MMC_CAP_NEEDS_POLL
 			)>;
@@ -566,17 +645,12 @@
 			)>;
 	spacemit,sdh-quirks2 = <(
 			SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
-			SDHCI_QUIRK2_BROKEN_PHY_MODULE |
-			SDHCI_QUIRK2_DISABLE_PROBE_CDSCAN
+			SDHCI_QUIRK2_BROKEN_PHY_MODULE
 			)>;
 	spacemit,rx_dline_reg = <0x01>;
+	spacemit,rx_tuning_limit = <50>;
 	spacemit,sdh-freq = <204800000>;
 	status = "okay";
-
-	//brcmf: wifi@1 {
-	//	compatible = "brcm,bcm4329-fmac";
-	//	reg = <1>;
-	//};
 };
 
 /* eMMC */
@@ -609,15 +683,15 @@
 	/* store forward mode */
 	tx-threshold = <1518>;
 	rx-threshold = <12>;
-	tx-ring-num = <128>;
-	rx-ring-num = <128>;
+	tx-ring-num = <1024>;
+	rx-ring-num = <1024>;
 	dma-burst-len = <5>;
 
 	ref-clock-from-phy;
 
 	clk-tuning-enable;
 	clk-tuning-by-delayline;
-	tx-phase = <90>;
+	tx-phase = <60>;
 	rx-phase = <73>;
 
 	nvmem-cells = <&mac_address0>;
@@ -650,8 +724,8 @@
         /* store forward mode */
 	tx-threshold = <1518>;
 	rx-threshold = <12>;
-	tx-ring-num = <128>;
-	rx-ring-num = <128>;
+	tx-ring-num = <1024>;
+	rx-ring-num = <1024>;
 	dma-burst-len = <5>;
 
 	ref-clock-from-phy;
@@ -707,9 +781,10 @@
 };
 
 &usb3hub {
-	usb-gpios = <&gpio 97 0>;	/* gpio_97 for usb3 pwren */
-	hub-gpios = <&gpio 123 0>;	/* usb3 hub en */
-	reset-gpios = <&gpio 124 0>;	/* usb3 hub rst*/
+	hub-gpios = <
+		&gpio 123 0	/* usb3 hub en */
+		&gpio 124 0>;	/* usb3 hub rst*/
+	vbus-gpios = <&gpio 97 0>;	/* gpio_97 for usb3 hub output vbus */
 	status = "okay";
 };
 
@@ -762,11 +837,11 @@
 };
 
 &pwm_bl {
-	pwms = <&pwm14 20156>;
+	pwms = <&pwm14 2000>;
 	brightness-levels = <
-		0   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15
-		16  17  18  19  20  21  22  23  24  25  26  27  28  29  30  31
-		32  33  34  35  36  37  38  39  40  41  42  43  44  45  46  47
+		0   40  40  40  40  40  40  40  40  40  40  40  40  40  40  40
+		40  40  40  40  40  40  40  40  40  40  40  40  40  40  40  40
+		40  40  40  40  40  40  40  40  40  41  42  43  44  45  46  47
 		48  49  50  51  52  53  54  55  56  57  58  59  60  61  62  63
 		64  65  66  67  68  69  70  71  72  73  74  75  76  77  78  79
 		80  81  82  83  84  85  86  87  88  89  90  91  92  93  94  95
@@ -786,38 +861,60 @@
 	status = "okay";
 };
 
-/* imx315 */
+/* ov16a10 */
 &backsensor {
-	af_2v8-supply = <&ldo_2>;
-	avdd_2v8-supply = <&ldo_3>;
+	af_2v8-supply = <&ldo_3>;
+	avdd_2v8-supply = <&ldo_2>;
 	dovdd_1v8-supply = <&ldo_7>;
 	dvdd_1v2-supply = <&ldo_6>;
 
+	pwdn-gpios = <&gpio 113 0>;
+	reset-gpios = <&gpio 111 0>;
+
 	status = "okay";
 };
-/* gc2375h */
+
 &backsensor_aux {
-	avdd_2v8-supply = <&ldo_3>;
+	avdd_2v8-supply = <&ldo_2>;
 	dovdd_1v8-supply = <&ldo_7>;
 
-	status = "okay";
+	status = "disabled";
 };
-/* S5K5E3 */
+
 &frontsensor {
-	avdd_2v8-supply = <&ldo_3>;
+	avdd_2v8-supply = <&ldo_2>;
 	dovdd_1v8-supply = <&ldo_7>;
 	dvdd_1v2-supply = <&ldo_6>;
 
+	status = "disabled";
+};
+&csiphy0 {
+
 	status = "okay";
 };
+&csiphy1 {
+
+	status = "disabled";
+};
+&csiphy2 {
+
+	status = "okay";
+};
+
 &ccic0 {
 	power-domains = <&power K1X_PMU_ISP_PWR_DOMAIN>;
+
+	status = "okay";
 };
 &ccic1 {
 	power-domains = <&power K1X_PMU_ISP_PWR_DOMAIN>;
+
+	status = "okay";
 };
 &ccic2 {
 	power-domains = <&power K1X_PMU_ISP_PWR_DOMAIN>;
+
+	status = "okay";
 };
 &isp {
 	power-domains = <&power K1X_PMU_ISP_PWR_DOMAIN>;
@@ -855,14 +952,24 @@
 	mbox-names = "vq0", "vq1";
 	interconnects = <&dram_range0>;
 	interconnect-names = "dma-mem";
-	memory-region = <&rcpu_mem_0>, <&vdev0vring0>, <&vdev0vring1>, <&vdev0buffer>, <&rsc_table>;
+	memory-region = <&rcpu_mem_0>, <&vdev0vring0>, <&vdev0vring1>, <&vdev0buffer>, <&rsc_table>, <&rcpu_mem_snapshots>;
 	status = "okay";
 };
 
-&cls0_trip3 {
+&cls0_trip2 {
 	temperature = <115000>;
 };
 
-&cls1_trip3 {
+&cls1_trip2 {
 	temperature = <115000>;
+};
+
+&spacemit_i2s {
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_sspa0_0>;
+        status = "okay";
+};
+
+&sound_es8326 {
+	status = "okay";
 };

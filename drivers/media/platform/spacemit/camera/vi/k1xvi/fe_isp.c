@@ -388,14 +388,6 @@ static struct {
 		.format = NV21,
 	},
 	{
-		.fmt_code = MEDIA_BUS_FMT_YUYV8_1X16,
-		.format = YUYV,
-	},
-	{
-		.fmt_code = MEDIA_BUS_FMT_YVYU8_1X16,
-		.format = YVYU,
-	},
-	{
 		.fmt_code = MEDIA_BUS_FMT_YUYV10_1X20,
 		.format = Y210,
 	},
@@ -1057,16 +1049,23 @@ static int fe_rawdump_subdev_video_s_stream(struct v4l2_subdev *sd, int enable)
 	struct csi *csi = NULL;
 	struct fe_pipe *pipe = NULL;
 	struct isp_context *isp_ctx = v4l2_get_subdevdata(sd);
-	struct spm_camera_pipeline *sc_pipeline = NULL;
+	struct media_entity *me_pipe0 = (struct media_entity*)isp_ctx->pipes[0];
+	struct media_entity *me_pipe1 = (struct media_entity*)isp_ctx->pipes[1];
+	struct spm_camera_pipeline *sc_pipeline = NULL, *sc_pipeline0 = NULL, *sc_pipeline1 = NULL;
 	struct media_pipeline *mpipe = media_entity_pipeline(&sd->entity);
 	unsigned int irq_bitmap = 0, cap_to_preview = 0;
 	unsigned int vi_flags = 0, clk_high = 0;
 	int ret = 0, source = 0, rawdump_only = 0, sensor_id = 0;
 
+	BUG_ON(!me_pipe0);
+	BUG_ON(!me_pipe1);
 	if (!mpipe) {
 		cam_err("%s(%s) pipe was null", __func__, sc_subdev->name);
 		return -1;
 	}
+
+	sc_pipeline0 = media_pipeline_to_sc_pipeline(me_pipe0);
+	sc_pipeline1 = media_pipeline_to_sc_pipeline(me_pipe1);
 	vi_flags = (rawdump->pad_fmts[PAD_IN].format.field >> SPACEMIT_VI_SWITCH_FLAGS_SHIFT) & SPACEMIT_VI_PRI_DATA_MASK;
 	cap_to_preview = vi_flags & SPACEMIT_VI_FLAG_BACK_TO_PREVIEW;
 	clk_high = vi_flags & SPACEMIT_VI_FLAG_CLK_HIGH;
@@ -1125,6 +1124,16 @@ static int fe_rawdump_subdev_video_s_stream(struct v4l2_subdev *sd, int enable)
 		hw_isp_top_enable_rawdump(SC_BLOCK(isp_ctx->pipes[rawdump->idx]), 1, rawdump_only);
 		if (isp_ctx->dma_block)
 			hw_dma_reset(isp_ctx->dma_block);
+		if (sc_pipeline0 && sc_pipeline1) {
+			if ((sc_pipeline0->is_online_mode && !sc_pipeline1->is_online_mode)
+				|| (!sc_pipeline0->is_online_mode && sc_pipeline1->is_online_mode)) {
+				hw_isp_top_set_speed_ctrl(SC_BLOCK(isp_ctx->pipes[0]), 1);
+			} else {
+				hw_isp_top_set_speed_ctrl(SC_BLOCK(isp_ctx->pipes[0]), 0);
+			}
+		} else {
+			hw_isp_top_set_speed_ctrl(SC_BLOCK(isp_ctx->pipes[0]), 0);
+		}
 		if (!cap_to_preview)
 			hw_isp_top_shadow_latch(SC_BLOCK(isp_ctx->pipes[rawdump->idx]));
 	} else {
@@ -2307,6 +2316,16 @@ static int fe_pipe_subdev_video_s_stream(struct v4l2_subdev *sd, int enable)
 		} else {
 			hw_isp_top_enable_hw_gap(SC_BLOCK(isp_ctx->pipes[0]), pipe->idx, 0);
 		}
+		if (sc_pipeline0 && sc_pipeline1) {
+			if ((sc_pipeline0->is_online_mode && !sc_pipeline1->is_online_mode)
+				|| (!sc_pipeline0->is_online_mode && sc_pipeline1->is_online_mode)) {
+				hw_isp_top_set_speed_ctrl(SC_BLOCK(isp_ctx->pipes[0]), 1);
+			} else {
+				hw_isp_top_set_speed_ctrl(SC_BLOCK(isp_ctx->pipes[0]), 0);
+			}
+		} else {
+				hw_isp_top_set_speed_ctrl(SC_BLOCK(isp_ctx->pipes[0]), 0);
+		}
 		if (!cap_to_preview)
 			hw_isp_top_shadow_latch(SC_BLOCK(pipe));
 	} else {
@@ -2851,7 +2870,6 @@ static int __fe_isp_s_power(struct v4l2_subdev *sd, int on)
 #ifdef CONFIG_SPACEMIT_DEBUG
 			vi_running_info.b_dev_running = true;
 #endif
-			cam_not("ZRong ------------ test");
 			hw_isp_top_enable_debug_clk(SC_BLOCK(isp_ctx->pipes[0]), 1);
 			hw_isp_top_set_irq_enable(SC_BLOCK(isp_ctx->pipes[0]), ISP_IRQ_G_RST_DONE, 0);
 			hw_isp_top_set_irq_enable(SC_BLOCK(isp_ctx->pipes[0]),
@@ -2865,7 +2883,6 @@ static int __fe_isp_s_power(struct v4l2_subdev *sd, int on)
 			hw_isp_top_set_idi_linebuf(SC_BLOCK(isp_ctx->pipes[0]), idi0_fifo_depth, 0, 0);
 			hw_isp_top_set_idi_linebuf(SC_BLOCK(isp_ctx->pipes[1]), idi1_fifo_depth, 0, 0);
 			hw_dma_reset(isp_ctx->dma_block);
-			cam_not("ZRong ------------ test");
 #if IS_ENABLED(CONFIG_DRM_SPACEMIT)
 			while (1) {
 				if (dpu_mclk_exclusive_get()) {
@@ -2960,9 +2977,6 @@ static int csi_subdev_core_s_power(struct v4l2_subdev *sd, int on)
 		if (v == 0) {
 			cam_not("csi s_power 0");
 			csi_ctrl->ops->clk_enable(csi_ctrl, 0);
-#if IS_ENABLED(CONFIG_SPACEMIT_CLK_DOVE) && IS_ENABLED(CONFIG_SPACEMIT_CORE_CLK_DOVE)
-			ddr_set_wb_ctrl(DDR_RW_RATIO_DEF);
-#endif
 		} else if (v < 0) {
 			atomic_inc(&(isp_ctx->ccic[sensor_id].pwr_cnt));
 			cam_err("%s(%s) invalid power off", __func__, sc_subdev->name);
@@ -3693,9 +3707,6 @@ static long fe_isp_subdev_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *
 		return 0;
 		break;
 	case VIDIOC_S_BANDWIDTH:
-#if IS_ENABLED(CONFIG_SPACEMIT_CLK_DOVE) && IS_ENABLED(CONFIG_SPACEMIT_CORE_CLK_DOVE)
-		ddr_set_wb_ctrl(DDR_RW_RATIO_CAM);
-#endif
 		return ret;
 		break;
 	case VIDIOC_DBG_REG_READ:

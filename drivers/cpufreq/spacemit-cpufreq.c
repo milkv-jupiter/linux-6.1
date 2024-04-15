@@ -9,22 +9,28 @@
 #include <linux/pm_qos.h>
 #include <linux/notifier.h>
 #include <linux/regulator/consumer.h>
+#include <linux/mutex.h>
 #include "../opp/opp.h"
 
 struct per_device_qos {
 	struct regulator *regulator;
 	struct freq_qos_request qos;
-	struct notifier_block notifier;
 };
 
+static DEFINE_MUTEX(regulator_mutex);
+static struct notifier_block vol_constraints_notifier;
 static struct freq_constraints vol_constraints;
 static struct per_device_qos *vol_qos[CONFIG_NR_CPUS];
 
+#ifdef CONFIG_CPU_HOTPLUG_THERMAL
+struct thermal_cooling_device **ghotplug_cooling;
+extern struct thermal_cooling_device **
+of_hotplug_cooling_register(struct cpufreq_policy *policy);
+#endif
+
 static int spacemit_vol_qos_notifier_call(struct notifier_block *nb, unsigned long action, void *data)
 {
-	struct per_device_qos *per_qos = container_of(nb, struct per_device_qos, notifier);
-
-	regulator_set_voltage(per_qos->regulator, action * 1000, action * 1000);
+	regulator_set_voltage(vol_qos[0]->regulator, action * 1000, action * 1000);
 
 	return 0;
 }
@@ -73,12 +79,17 @@ static int spacemit_policy_notifier(struct notifier_block *nb,
 		vol_qos[cpu]->regulator = vol_qos[0]->regulator;
 	}
 
-	vol_qos[cpu]->notifier.notifier_call = spacemit_vol_qos_notifier_call;
-	freq_qos_add_notifier(&vol_constraints, FREQ_QOS_MIN, &vol_qos[cpu]->notifier);
-
 	if (vol_qos[cpu]->regulator)
 		freq_qos_add_request(&vol_constraints, &vol_qos[cpu]->qos, FREQ_QOS_MIN,
 				regulator_get_voltage(vol_qos[cpu]->regulator) / 1000);
+
+#ifdef CONFIG_CPU_HOTPLUG_THERMAL
+       ghotplug_cooling = of_hotplug_cooling_register(policy);
+       if (!ghotplug_cooling) {
+               pr_err("register hotplug cpu cooling failed\n");
+               return -EINVAL;
+       }
+#endif
 	return 0;
 }
 
@@ -112,6 +123,8 @@ static int spacemit_processor_notifier(struct notifier_block *nb,
 	ace_clk = of_clk_get_by_name(opp_table->np, "ace");
 
 	if (event == CPUFREQ_PRECHANGE) {
+
+		mutex_lock(&regulator_mutex);
 
 		if (freqs->new > freqs->old) {
 			/* increase voltage first */
@@ -159,6 +172,8 @@ static int spacemit_processor_notifier(struct notifier_block *nb,
 			if (vol_qos[cpu]->regulator)
 				freq_qos_update_request(&vol_qos[cpu]->qos, microvol / 1000);
 		}
+
+		mutex_unlock(&regulator_mutex);
 	}
 
 	dev_pm_opp_put_opp_table(opp_table);
@@ -190,7 +205,9 @@ static int __init spacemit_processor_driver_init(void)
                return -EINVAL;
        }
 
+       vol_constraints_notifier.notifier_call = spacemit_vol_qos_notifier_call;
        freq_constraints_init(&vol_constraints);
+       freq_qos_add_notifier(&vol_constraints, FREQ_QOS_MIN, &vol_constraints_notifier);
 
        return 0;
 }

@@ -14,6 +14,7 @@
 #include <asm/auxvec.h>
 #include <asm/byteorder.h>
 #include <asm/cacheinfo.h>
+#include <asm/vector.h>
 
 /*
  * These are used to set parameters in the core dumps.
@@ -29,6 +30,10 @@
 #endif
 
 #define ELF_DATA	ELFDATA2LSB
+
+#define ELF_PLAT_INIT(_r, load_addr)	do { \
+	riscv_v_csr_init(); \
+} while (0)
 
 /*
  * This is used to ensure we don't load something for the wrong architecture.

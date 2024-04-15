@@ -129,6 +129,7 @@ config RISCV
 	select TRACE_IRQFLAGS_SUPPORT
 	select UACCESS_MEMCPY if !MMU
 	select ZONE_DMA32 if 64BIT && !SOC_SPACEMIT_K1PRO
+	select ARCH_SUSPEND_POSSIBLE
 
 config ARCH_MMAP_RND_BITS_MIN
 	default 18 if 64BIT
@@ -767,9 +768,21 @@ config PORTABLE
 	select OF
 	select MMU
 
+config IMAGE_LOAD_OFFSET
+	hex "Image load offset from start of RAM when load kernel to RAM"
+	default 0x400000 if 32BIT
+	default 0x200000 if 64BIT
+	help
+	  This is the RAM offset from start of ram. Bootloader would use
+	  this offset to load kernel image to ram.
+
 menu "Power management options"
 
 source "kernel/power/Kconfig"
+
+config ARCH_SUSPEND_POSSIBLE
+	depends on SOC_SPACEMIT
+	def_bool y
 
 endmenu # "Power management options"
 

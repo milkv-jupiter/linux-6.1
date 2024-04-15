@@ -137,12 +137,13 @@ struct k1x_pcie {
 	struct phy		**phy;
 	int pcie_init_before_kernel;
 	int			port_id;
+	int			num_lanes;
 	int			link_gen;
 	struct irq_domain	*irq_domain;
 	enum dw_pcie_device_mode mode;
 	struct page             *msi_page;
+	struct page             *msix_page;
 	dma_addr_t              msix_addr;
-	void __iomem            *msix_vaddr;
 	struct	clk *clk_pcie;  /*include master slave slave_lite clk*/
 	struct	clk *clk_master;
 	struct	clk *clk_slave;
@@ -376,12 +377,7 @@ void rterm_force(struct k1x_pcie *k1x, u32 pcie_rcal)
 	int i, lane;
 	u32 val = 0;
 
-	if (k1x->port_id != 0x0) {
-		lane = 2;
-	} else {
-		lane = 1;
-	}
-
+	lane = k1x->num_lanes;
 	printk("pcie_rcal = 0x%08x\n", pcie_rcal);
 	printk("pcie port id = %d, lane num = %d\n", k1x->port_id, lane);
 
@@ -831,9 +827,13 @@ void k1x_pcie_msix_addr_alloc(struct dw_pcie_rp *pp)
 	u64 msi_target;
 	u32 reg;
 
-	k1x->msix_vaddr = dma_alloc_coherent(dev, PAGE_SIZE, &(k1x->msix_addr), GFP_KERNEL);
-	if (!k1x->msix_addr) {
-		dev_err(dev, "Failed to alloc MSIx data\n");
+	k1x->msix_page = alloc_page(GFP_KERNEL);
+	k1x->msix_addr = dma_map_page(dev, k1x->msix_page, 0, PAGE_SIZE,
+				    DMA_FROM_DEVICE);
+	if (dma_mapping_error(dev, k1x->msix_addr)) {
+		dev_err(dev, "Failed to map MSIX address\n");
+		__free_page(k1x->msix_page);
+		k1x->msix_page = NULL;
 		return;
 	}
 	msi_target = (u64)k1x->msix_addr;
@@ -1485,14 +1485,23 @@ static int __init k1x_pcie_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	/* parse clk source*/
-	k1x->clk_pcie = devm_clk_get(dev, "pcie-clk");
-	if (IS_ERR(k1x->clk_pcie))
-		return PTR_ERR(k1x->clk_pcie);
+	if (of_property_read_u32(np, "num-lanes", &k1x->num_lanes)) {
+		dev_warn(dev, "Failed to get pcie's port num-lanes.\n");
+		k1x->num_lanes = 1;
+	}
+	if((k1x->num_lanes < 1) || (k1x->num_lanes > 2)) {
+		dev_warn(dev, "configuration of num-lanes is invalid.\n");
+		k1x->num_lanes = 1;
+	}
 
-	k1x->reset = devm_reset_control_get_optional(dev, NULL);
+	/* pcie0 and usb use combo phy and reset */
+	if (k1x->port_id == 0) {
+		k1x->reset = devm_reset_control_array_get_shared(dev);
+	} else {
+		k1x->reset = devm_reset_control_get_optional(dev, NULL);
+	}
 	if (IS_ERR(k1x->reset)) {
-		dev_err(dev, "Failed to get pcie's resets\n");
+		dev_err(dev, "Failed to get pcie%d's resets\n", k1x->port_id);
 		return PTR_ERR(k1x->reset);
 	}
 
@@ -1500,9 +1509,9 @@ static int __init k1x_pcie_probe(struct platform_device *pdev)
 	k1x->pci = pci;
 	platform_set_drvdata(pdev, k1x);
 
-	ret = clk_prepare_enable(k1x->clk_pcie);
-	if(ret < 0)
-		return ret;
+	pm_runtime_enable(&pdev->dev);
+	pm_runtime_get_sync(&pdev->dev);
+	pm_runtime_get_noresume(&pdev->dev);
 
 	reset_control_deassert(k1x->reset);
 

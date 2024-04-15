@@ -478,15 +478,26 @@ static int dpu_enable_clocks(struct spacemit_dpu *dpu)
 	struct drm_crtc *crtc = &dpu->crtc;
 	struct drm_display_mode *mode = &crtc->mode;
 	uint64_t clk_val;
+	uint64_t set_clk_val;
 	struct spacemit_drm_private *priv = dpu->crtc.dev->dev_private;
 	struct spacemit_hw_device *hwdev = priv->hwdev;
 
 	if (hwdev->is_hdmi) {
 		clk_prepare_enable(clk_ctx->hmclk);
+
+		clk_val = clk_get_rate(clk_ctx->hmclk);
+		if(clk_val != DPU_MCLK_DEFAULT){
+			clk_val = clk_round_rate(clk_ctx->hmclk, DPU_MCLK_DEFAULT);
+			if (dpu_mclk_exclusive_get()) {
+				clk_set_rate(clk_ctx->hmclk, clk_val);
+				DRM_DEBUG("mclk=%lld\n", clk_val);
+				dpu_mclk_exclusive_put();
+			}
+		}
+
 		clk_val = clk_get_rate(clk_ctx->hmclk);
 		DRM_INFO("hmclk=%lld\n", clk_val);
 	} else {
-		uint64_t set_clk_val;
 
 		clk_prepare_enable(clk_ctx->pxclk);
 		clk_prepare_enable(clk_ctx->mclk);
@@ -496,8 +507,6 @@ static int dpu_enable_clocks(struct spacemit_dpu *dpu)
 
 		set_clk_val = mode->clock * 1000;
 		DRM_INFO("pxclk set_clk_val %lld\n", set_clk_val);
-		set_clk_val = DPU_PXCLK_DEFAULT;
-		DRM_INFO("pxclk default %lld\n", set_clk_val);
 
 		if (set_clk_val) {
 			set_clk_val = clk_round_rate(clk_ctx->pxclk, set_clk_val);
@@ -944,7 +953,7 @@ void spacemit_plane_update_hw_channel(struct drm_plane *plane)
 
 	switch (pixel_alpha) {
 	case DRM_MODE_BLEND_PIXEL_NONE:
-		/* Dove A0 supports knone + layer alpha*/
+		/* k1x supports knone + layer alpha*/
 		alpha_sel = 0x0;
 		fallthrough;
 	case DRM_MODE_BLEND_COVERAGE:
@@ -1469,14 +1478,13 @@ static int dpu_init(struct spacemit_dpu *dpu)
 	writel(0xFF65FF05, addr + 0x4c);
 #endif
 
-	if (hwdev->is_hdmi) {
-		value = readl_relaxed(ciu_addr + 0x011c);
-		DRM_INFO("%s ciu offset 0x011c:0x%x\n", __func__, value);
-		writel(value | 0xff00, ciu_addr + 0x0124);
-		udelay(2);
-		value = readl_relaxed(ciu_addr + 0x0124);
-		DRM_INFO("%s ciu offset 0x0124:0x%x\n", __func__, value);
-	}
+	// modified hdmi and mipi dsi qos
+	value = readl_relaxed(ciu_addr + 0x011c);
+	DRM_INFO("%s ciu offset 0x011c:0x%x\n", __func__, value);
+	writel(value | 0xffff, ciu_addr + 0x0124);
+	udelay(2);
+	value = readl_relaxed(ciu_addr + 0x0124);
+	DRM_INFO("%s ciu offset 0x0124:0x%x\n", __func__, value);
 
 	saturn_init_regs(dpu);
 	saturn_setup_dma_top(dpu);
@@ -1499,9 +1507,16 @@ static uint32_t dpu_isr(struct spacemit_dpu *dpu)
 	u32 base = DPU_INT_BASE_ADDR;
 	struct spacemit_drm_private *priv = dpu->crtc.dev->dev_private;
 	struct spacemit_hw_device *hwdev = priv->hwdev;
-	static bool flip_done = false;
+	static bool flip_done[DP_MAX_DEVICES] = {false};
 	struct drm_writeback_connector *wb_conn = &dpu->wb_connector;
 	u8 channel = dpu->dev_id;
+	int flip_id;
+
+	if (hwdev->is_hdmi) {
+		flip_id = SATURN_HDMI;
+	} else {
+		flip_id = SATURN_LE;
+	}
 
 	trace_dpu_isr(dpu->dev_id);
 
@@ -1530,7 +1545,8 @@ static uint32_t dpu_isr(struct spacemit_dpu *dpu)
 		if (irq_raw & DPU_INT_CFG_RDY_CLR) {
 			dpu_write_reg_w1c(hwdev, DPU_INTP_REG, base, v.dpu_int_reg_14, DPU_INT_CFG_RDY_CLR);
 			trace_dpu_isr_status("cfg_rdy_clr", irq_raw & DPU_INT_CFG_RDY_CLR);
-			flip_done = false;
+			flip_done[flip_id] = false;
+
 			trace_u64_data("irq crtc mclk cur", dpu->cur_mclk);
 			trace_u64_data("irq crtc mclk new", dpu->new_mclk);
 			trace_u64_data("irq crtc bw cur", dpu->cur_bw);
@@ -1548,13 +1564,16 @@ static uint32_t dpu_isr(struct spacemit_dpu *dpu)
 		if (irq_raw & DPU_INT_FRM_TIMING_VSYNC) {
 			struct drm_crtc *crtc = &dpu->crtc;
 			dpu_write_reg_w1c(hwdev, DPU_INTP_REG, base, v.dpu_int_reg_14, DPU_INT_FRM_TIMING_VSYNC);
+			trace_u64_data("dpu name", (u64)hwdev->is_hdmi);
 			trace_dpu_isr_status("vsync", irq_raw & DPU_INT_FRM_TIMING_VSYNC);
 			drm_crtc_handle_vblank(crtc);
-			if (!flip_done) {
+
+			if (!flip_done[flip_id]) {
 				struct drm_device *drm = dpu->crtc.dev;
 				struct drm_pending_vblank_event *event = crtc->state->event;
 
-				flip_done = true;
+				flip_done[flip_id] = true;
+
 				spin_lock(&drm->event_lock);
 				if (crtc->state->event) {
 					/*

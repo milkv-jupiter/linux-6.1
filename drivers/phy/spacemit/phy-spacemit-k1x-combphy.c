@@ -214,16 +214,10 @@ static int spacemit_combphy_probe(struct platform_device *pdev)
 
 	priv->num_clks = devm_clk_bulk_get_all(dev, &priv->clks);
 
-	priv->phy_rst = devm_reset_control_array_get_exclusive(dev);
+	priv->phy_rst = devm_reset_control_array_get_shared(dev);
 	if (IS_ERR(priv->phy_rst))
 		return dev_err_probe(dev, PTR_ERR(priv->phy_rst),
 					 "failed to get phy reset\n");
-
-	ret = reset_control_assert(priv->phy_rst);
-	if (ret) {
-		dev_err(dev, "failed to reset assert phy\n");
-		return ret;
-	}
 
 	priv->phy = devm_phy_create(dev, NULL, &spacemit_combphy_ops);
 	if (IS_ERR(priv->phy)) {

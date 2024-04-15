@@ -268,7 +268,7 @@ static void jpu_sreset_assert(struct jpu_device *jdev)
 }
 
 
-#ifndef CONFIG_DOVE_FPGA
+#ifndef CONFIG_SOC_SPACEMIT_K1_FPGA
 static int jpu_aclk_enable(struct jpu_device *jdev)
 {
 	if (IS_ERR_OR_NULL(jdev->aclk)) {
@@ -915,7 +915,7 @@ static long jpu_ioctl(struct file *filp, u_int cmd, u_long arg)
 	struct dma_buf_attachment *attach;
 	struct sg_table *sg_table;
 	jpu_dma_buf_info pInfo;
-#ifndef CONFIG_DOVE_FPGA
+#ifndef CONFIG_SOC_SPACEMIT_K1_FPGA
 	u32 clkgate;
 #endif
 	int ret = 0;
@@ -1058,7 +1058,7 @@ static long jpu_ioctl(struct file *filp, u_int cmd, u_long arg)
 #endif
 		break;
 	case JDI_IOCTL_SET_CLOCK_GATE:;
-#ifndef CONFIG_DOVE_FPGA
+#ifndef CONFIG_SOC_SPACEMIT_K1_FPGA
 		ret = down_interruptible(&jdev->s_jpu_sem);
 		if (ret) {
 			return -EAGAIN;
@@ -1070,9 +1070,11 @@ static long jpu_ioctl(struct file *filp, u_int cmd, u_long arg)
 		}
 
 		if (clkgate) {
+			pm_runtime_get_sync(jdev->jdev);
 			jpu_clk_enable(jdev);
 		} else {
 			jpu_clk_disable(jdev);
+			pm_runtime_put_sync(jdev->jdev);
 		}
 
 		up(&jdev->s_jpu_sem);
@@ -1170,7 +1172,7 @@ static long jpu_ioctl(struct file *filp, u_int cmd, u_long arg)
 		     (int)inst_info.inst_idx, inst_info.inst_open_count);
 		break;
 	case JDI_IOCTL_RESET:
-#ifndef CONFIG_DOVE_FPGA
+#ifndef CONFIG_SOC_SPACEMIT_K1_FPGA
 
 		ret = down_interruptible(&jdev->s_jpu_sem);
 		if (ret) {
@@ -1258,7 +1260,7 @@ static int jpu_release(struct inode *inode, struct file *filp)
 			vfree((const void *)jdev->s_instance_pool.base);
 			jdev->s_instance_pool.base = 0;
 		}
-#ifndef CONFIG_DOVE_FPGA
+#ifndef CONFIG_SOC_SPACEMIT_K1_FPGA
 		jpu_clk_disable(jdev);
 		pm_runtime_put_sync(jdev->jdev);
 
@@ -1567,7 +1569,7 @@ static int jpu_probe(struct platform_device *pdev)
 		dev_err(jdev->jdev, "irq not be registered\n");
 		return err;
 	}
-#ifndef CONFIG_DOVE_FPGA
+#ifndef CONFIG_SOC_SPACEMIT_K1_FPGA
 
 	jdev->aclk = devm_clk_get(&pdev->dev, "aclk");
 	if (IS_ERR_OR_NULL(jdev->aclk)) {
@@ -1721,8 +1723,9 @@ static int jpu_remove(struct platform_device *pdev)
 		unregister_chrdev_region(jdev->s_jpu_major, 1);
 		jdev->s_jpu_major = 0;
 	}
-#ifndef CONFIG_DOVE_FPGA
+#ifndef CONFIG_SOC_SPACEMIT_K1_FPGA
 	jpu_clk_disable(jdev);
+	pm_runtime_put_sync(jdev->jdev);
 	pm_runtime_disable(&pdev->dev);
 #endif
 	sysfs_remove_groups(&pdev->dev.kobj, jpu_frequency_group);
@@ -1735,7 +1738,7 @@ static int jpu_remove(struct platform_device *pdev)
 #ifdef CONFIG_PM
 static int jpu_suspend(struct platform_device *pdev, pm_message_t state)
 {
-#ifndef CONFIG_DOVE_FPGA
+#ifndef CONFIG_SOC_SPACEMIT_K1_FPGA
 	struct jpu_device *jdev = platform_get_drvdata(pdev);
 	jpu_clk_disable(jdev);
 #endif

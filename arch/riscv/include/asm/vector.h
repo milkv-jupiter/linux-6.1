@@ -67,6 +67,16 @@ static __always_inline void riscv_v_disable(void)
 	csr_clear(CSR_SSTATUS, SR_VS);
 }
 
+static __always_inline void riscv_v_csr_init(void)
+{
+	riscv_v_enable();
+	asm volatile (
+		"csrw	" __stringify(CSR_VSTART) ", 0\n\t"
+		"csrw	" __stringify(CSR_VCSR) ", 0\n\t"
+		: : :);
+	riscv_v_disable();
+}
+
 static __always_inline void __vstate_csr_save(struct __riscv_v_ext_state *dest)
 {
 	asm volatile (
@@ -183,6 +193,7 @@ static inline bool riscv_v_vstate_query(struct pt_regs *regs) { return false; }
 #define __switch_to_vector(__prev, __next)	do {} while (0)
 #define riscv_v_vstate_off(regs)		do {} while (0)
 #define riscv_v_vstate_on(regs)			do {} while (0)
+#define riscv_v_csr_init()				do {} while (0)
 
 #endif /* CONFIG_RISCV_ISA_V */
 /*

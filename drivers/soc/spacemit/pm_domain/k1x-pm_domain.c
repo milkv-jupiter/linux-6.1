@@ -20,6 +20,8 @@
 #include <linux/mfd/syscon.h>
 #include <linux/spinlock_types.h>
 #include <linux/regulator/consumer.h>
+#include <dt-bindings/pmu/k1x_pmu.h>
+#include <linux/syscore_ops.h>
 #include "atomic_qos.h"
 
 #define MAX_REGMAP		5
@@ -30,6 +32,16 @@
 
 #define APMU_POWER_STATUS_REG	0xf0
 #define MPMU_APCR_PER_REG	0x1098
+#define MPMU_AWUCRM_REG		0x104c
+
+#define APMU_AUDIO_CLK_RES_CTRL	0x14c
+#define AP_POWER_CTRL_AUDIO_AUTH_OFFSET	28
+#define FORCE_AUDIO_POWER_ON_OFFSET	13
+
+/* wakeup set */
+/* pmic */
+#define WAKEUP_SOURCE_WAKEUP_7	7
+
 
 #define PM_QOS_BLOCK_C1		0x0 /* core wfi */
 #define PM_QOS_BLOCK_C2		0x2 /* core power off */
@@ -115,6 +127,7 @@ struct spacemit_pmu {
 
 static DEFINE_SPINLOCK(spacemit_apcr_qos_lock);
 
+static unsigned int g_acpr_per;
 static struct spacemit_pmu *gpmu;
 
 static struct atomic_freq_constraints afreq_constraints;
@@ -137,7 +150,7 @@ static int spacemit_pd_power_off(struct generic_pm_domain *domain)
 	/**
 	 * if all the devices in this power domain don't want the pm-domain driver taker over
 	 * the power-domian' on/off, return directly.
-	 * */
+	 */
 	list_for_each_entry(pos, &spd->qos_head, qos_node) {
 		if (!pos->handle_pm_domain)
 			return 0;
@@ -242,9 +255,57 @@ static int spacemit_pd_power_on(struct generic_pm_domain *domain)
 		}
 	}
 
+	if (spd->pm_index == K1X_PMU_AUD_PWR_DOMAIN) {
+		regmap_read(gpmu->regmap[APMU_REGMAP_INDEX], APMU_AUDIO_CLK_RES_CTRL, &val);
+		val |= (1 << AP_POWER_CTRL_AUDIO_AUTH_OFFSET);
+		regmap_write(gpmu->regmap[APMU_REGMAP_INDEX], APMU_AUDIO_CLK_RES_CTRL, val);
+	}
+
 	regmap_read(gpmu->regmap[APMU_REGMAP_INDEX], APMU_POWER_STATUS_REG, &val);
-	if (val & (1 << spd->param.bit_pwr_stat))
-		return 0;
+	if (val & (1 << spd->param.bit_pwr_stat)) {
+		if (!spd->param.use_hw) {
+			/* this is the sw type */
+			regmap_read(gpmu->regmap[APMU_REGMAP_INDEX], spd->param.reg_pwr_ctrl, &val);
+			val &= ~(1 << spd->param.bit_isolation);
+			regmap_write(gpmu->regmap[APMU_REGMAP_INDEX], spd->param.reg_pwr_ctrl, val);
+
+			usleep_range(10, 15);
+
+			/* mcu power off */
+			regmap_read(gpmu->regmap[APMU_REGMAP_INDEX], spd->param.reg_pwr_ctrl, &val);
+			val &= ~((1 << spd->param.bit_sleep1) | (1 << spd->param.bit_sleep2));
+			regmap_write(gpmu->regmap[APMU_REGMAP_INDEX], spd->param.reg_pwr_ctrl, val);
+
+			usleep_range(10, 15);
+
+			for (loop = 10000; loop >= 0; --loop) {
+				regmap_read(gpmu->regmap[APMU_REGMAP_INDEX], APMU_POWER_STATUS_REG, &val);
+				if ((val & (1 << spd->param.bit_pwr_stat)) == 0)
+					break;
+				usleep_range(4, 6);
+			}
+		} else {
+			/* LCD */
+			regmap_read(gpmu->regmap[APMU_REGMAP_INDEX], spd->param.reg_pwr_ctrl, &val);
+			val &= ~(1 << spd->param.bit_auto_pwr_on);
+			val &= ~(1 << spd->param.bit_hw_mode);
+			regmap_write(gpmu->regmap[APMU_REGMAP_INDEX], spd->param.reg_pwr_ctrl, val);
+
+			usleep_range(10, 30);
+
+			for (loop = 10000; loop >= 0; --loop) {
+				regmap_read(gpmu->regmap[APMU_REGMAP_INDEX], APMU_POWER_STATUS_REG, &val);
+				if ((val & (1 << spd->param.bit_hw_pwr_stat)) == 0)
+					break;
+				usleep_range(4, 6);
+			}
+		}
+
+		if (loop < 0) {
+			pr_err("power-off domain: %d, error\n", spd->pm_index);
+			return -EBUSY;
+		}
+	}
 
 	if (!spd->param.use_hw) {
 		/* mcu power on */
@@ -293,6 +354,13 @@ static int spacemit_pd_power_on(struct generic_pm_domain *domain)
 	if (loop < 0) {
 		pr_err("power-on domain: %d, error\n", spd->pm_index);
 		return -EBUSY;
+	}
+
+	/* for audio power domain, we should let the rcpu handle it, and disable force power on */
+	if (spd->pm_index == K1X_PMU_AUD_PWR_DOMAIN) {
+		regmap_read(gpmu->regmap[APMU_REGMAP_INDEX], APMU_AUDIO_CLK_RES_CTRL, &val);
+		val &= ~((1 << AP_POWER_CTRL_AUDIO_AUTH_OFFSET) | (1 << FORCE_AUDIO_POWER_ON_OFFSET));
+		regmap_write(gpmu->regmap[APMU_REGMAP_INDEX], APMU_AUDIO_CLK_RES_CTRL, val);
 	}
 
 	return 0;
@@ -636,7 +704,11 @@ static int spacemit_pm_add_one_domain(struct spacemit_pmu *pmu, struct device_no
 	pd->genpd.dev_ops.stop = spacemit_genpd_stop;
 	pd->genpd.dev_ops.start = spacemit_genpd_start;
 
-	pm_genpd_init(&pd->genpd, NULL, true);
+	/* audio power-domain is power-on by default */
+	if (id == K1X_PMU_AUD_PWR_DOMAIN)
+		pm_genpd_init(&pd->genpd, NULL, false);
+	else
+		pm_genpd_init(&pd->genpd, NULL, true);
 
 	pmu->domains[id] = pd;
 
@@ -718,8 +790,59 @@ static void spacemit_pm_domain_cleanup(struct spacemit_pmu *pmu)
 	}
 
 	/* devm will free our memory */
-
 }
+
+#ifdef CONFIG_PM_SLEEP
+static int acpr_per_suspend(void)
+{
+	unsigned int apcr_per;
+	unsigned int apcr_clear = 0, apcr_set = (1 << PM_QOS_PE_VOTE_AP_SLPEN_OFFSET);
+
+	spin_lock(&spacemit_apcr_qos_lock);
+
+	apcr_set |= (1 << PM_QOS_AXISDD_OFFSET);
+	apcr_set |= (1 << PM_QOS_DDRCORSD_OFFSET);
+	apcr_set |= (1 << PM_QOS_APBSD_OFFSET);
+	apcr_set |= (1 << PM_QOS_VCTCXOSD_OFFSET);
+	apcr_set |= (1 << PM_QOS_STBYEN_OFFSET);
+
+	regmap_read(gpmu->regmap[MPMU_REGMAP_INDEX], MPMU_APCR_PER_REG, &apcr_per);
+	g_acpr_per = apcr_per;
+	apcr_per &= ~(apcr_clear);
+	apcr_per |= apcr_set;
+	regmap_write(gpmu->regmap[MPMU_REGMAP_INDEX], MPMU_APCR_PER_REG, apcr_per);
+
+	spin_unlock(&spacemit_apcr_qos_lock);
+
+	/* enable pmic wakeup */
+	regmap_read(gpmu->regmap[MPMU_REGMAP_INDEX], MPMU_AWUCRM_REG, &apcr_per);
+	apcr_per |= (1 << WAKEUP_SOURCE_WAKEUP_7);
+	regmap_write(gpmu->regmap[MPMU_REGMAP_INDEX], MPMU_AWUCRM_REG, apcr_per);
+
+	return 0;
+}
+
+static void acpr_per_resume(void)
+{
+	unsigned int apcr_per;
+
+	spin_lock(&spacemit_apcr_qos_lock);
+
+	regmap_write(gpmu->regmap[MPMU_REGMAP_INDEX], MPMU_APCR_PER_REG, g_acpr_per);
+
+	spin_unlock(&spacemit_apcr_qos_lock);
+
+	/* disable pmic wakeup */
+	regmap_read(gpmu->regmap[MPMU_REGMAP_INDEX], MPMU_AWUCRM_REG, &apcr_per);
+	apcr_per &= ~(1 << WAKEUP_SOURCE_WAKEUP_7);
+	regmap_write(gpmu->regmap[MPMU_REGMAP_INDEX], MPMU_AWUCRM_REG, apcr_per);
+}
+
+static struct syscore_ops acpr_per_syscore_ops = {
+	.suspend = acpr_per_suspend,
+	.resume = acpr_per_resume,
+};
+#endif
 
 static int spacemit_pm_domain_probe(struct platform_device *pdev)
 {
@@ -803,6 +926,9 @@ static int spacemit_pm_domain_probe(struct platform_device *pdev)
 
 	gpmu = pmu;
 
+#ifdef CONFIG_PM_SLEEP
+	register_syscore_ops(&acpr_per_syscore_ops);
+#endif
 	return 0;
 
 err_out:

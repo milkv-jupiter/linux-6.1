@@ -65,12 +65,6 @@
 				compatible = "riscv,cpu-intc";
 				interrupt-controller;
 			};
-
-                         thermal-idle {
-                                 #cooling-cells = <2>;
-                                 duration-us = <10000>;
-                                 exit-latency-us = <500>;
-                         };
 		};
 
 		cpu_1: cpu@1 {
@@ -99,12 +93,6 @@
 				compatible = "riscv,cpu-intc";
 				interrupt-controller;
 			};
-
-                         thermal-idle {
-                                 #cooling-cells = <2>;
-                                 duration-us = <10000>;
-                                 exit-latency-us = <500>;
-                         };
 		};
 
 		cpu_2: cpu@2 {
@@ -133,12 +121,6 @@
 				compatible = "riscv,cpu-intc";
 				interrupt-controller;
 			};
-
-                         thermal-idle {
-                                 #cooling-cells = <2>;
-                                 duration-us = <10000>;
-                                 exit-latency-us = <500>;
-                         };
 		};
 
 		cpu_3: cpu@3 {
@@ -167,12 +149,6 @@
 				compatible = "riscv,cpu-intc";
 				interrupt-controller;
 			};
-
-                         thermal-idle {
-                                 #cooling-cells = <2>;
-                                 duration-us = <10000>;
-                                 exit-latency-us = <500>;
-                         };
 		};
 
 		cpu_4: cpu@4 {
@@ -201,12 +177,6 @@
 				compatible = "riscv,cpu-intc";
 				interrupt-controller;
 			};
-
-                         thermal-idle {
-                                 #cooling-cells = <2>;
-                                 duration-us = <10000>;
-                                 exit-latency-us = <500>;
-                         };
 		};
 
 		cpu_5: cpu@5 {
@@ -235,12 +205,6 @@
 				compatible = "riscv,cpu-intc";
 				interrupt-controller;
 			};
-
-                         thermal-idle {
-                                 #cooling-cells = <2>;
-                                 duration-us = <10000>;
-                                 exit-latency-us = <500>;
-                         };
 		};
 
 		cpu_6: cpu@6 {
@@ -269,12 +233,6 @@
 				compatible = "riscv,cpu-intc";
 				interrupt-controller;
 			};
-
-                         thermal-idle {
-                                 #cooling-cells = <2>;
-                                 duration-us = <10000>;
-                                 exit-latency-us = <500>;
-                         };
 		};
 
 		cpu_7: cpu@7 {
@@ -303,12 +261,6 @@
 				compatible = "riscv,cpu-intc";
 				interrupt-controller;
 			};
-
-                         thermal-idle {
-                                 #cooling-cells = <2>;
-                                 duration-us = <10000>;
-                                 exit-latency-us = <500>;
-                         };
 		};
 
 		clst0_l2_cache: l2-cache0 {
@@ -518,7 +470,7 @@
 			reg = <0x0 0x80000000 0x0 0x40800000>;
 		};
 
-		/* rcpu code & data & heap space */
+		/* sram area, used for rcpu code & data & heap space */
 		rcpu_mem_0: mem@c0800000 {
 			reg = <0x0 0xc0800000 0x0 0x40000>;
 			da_base = <0x0>;
@@ -561,6 +513,12 @@
 			reg = <0x0 0x302fc000 0x0 0x4000>;
 			no-map;
 		};
+
+		/* memory snapshots of rcpu when rcpu poweroff */
+		rcpu_mem_snapshots: rcpu_mem_snapshots@30300000 {
+			reg = <0x0 0x30300000 0x0 0x40000>;
+			no-map;
+		};
 	};
 
 	soc: soc {
@@ -590,6 +548,16 @@
 			status = "okay";
 		};
 
+		dram_range2: dram_range@2 {
+			compatible = "spacemit-dram-bus";
+			#address-cells = <2>;
+			#size-cells = <2>;
+			dma-ranges = <0x0 0x00000000 0x0 0x00000000 0x0 0x80000000>,
+				     <0x0 0xb8000000 0x1 0x38000000 0x3 0x48000000>;
+			#interconnect-cells = <0>;
+			status = "okay";
+		};
+
 		clint0: clint@e4000000 {
 			compatible = "riscv,clint0";
 			interrupts-extended = <
@@ -614,8 +582,9 @@
 				<0x0 0xd4282c00 0x0 0x400>,
 				<0x0 0xd8440000 0x0 0x98>,
 				<0x0 0xc0000000 0x0 0x4280>,
-				<0x0 0xf0610000 0x0 0x20>;
-			reg-names = "mpmu", "apmu", "apbc", "apbs", "ciu", "dciu", "ddrc", "apbc2";
+				<0x0 0xf0610000 0x0 0x20>,
+				<0x0 0xc0882000 0x0 0x50>;
+			reg-names = "mpmu", "apmu", "apbc", "apbs", "ciu", "dciu", "ddrc", "apbc2", "rcpu";
 			clocks = <&vctcxo_24>, <&vctcxo_3>, <&vctcxo_1>, <&pll1_2457p6_vco>,
 				<&clk_32k>;
 			clock-names = "vctcxo_24", "vctcxo_3", "vctcxo_1", "pll1_2457p6_vco",
@@ -633,8 +602,9 @@
 				<0x0 0xd4282c00 0x0 0x400>,
 				<0x0 0xd8440000 0x0 0x98>,
 				<0x0 0xc0000000 0x0 0x4280>,
-				<0x0 0xf0610000 0x0 0x20>;
-			reg-names = "mpmu", "apmu", "apbc", "apbs", "ciu", "dciu", "ddrc", "apbc2";
+				<0x0 0xf0610000 0x0 0x20>,
+				<0x0 0xc0882000 0x0 0x50>;
+			reg-names = "mpmu", "apmu", "apbc", "apbs", "ciu", "dciu", "ddrc", "apbc2", "rcpu";
 			#reset-cells = <1>;
 			status = "okay";
 		};
@@ -821,6 +791,9 @@
 			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
 			clk,pm-runtime,no-sleep;
 			cpuidle,pm-runtime,sleep;
+			dmas = <&pdma0 DMA_UART0_RX 1
+				&pdma0 DMA_UART0_TX 1>;
+			dma-names = "rx", "tx";
 			interconnects = <&dram_range0>;
 			interconnect-names = "dma-mem";
 			status = "ok";
@@ -950,7 +923,8 @@
 			interrupt-parent = <&intc>;
 			reg = <0x0 0xd4017800 0x0 0x100>;
 			interrupts = <51>;
-			clocks = <&ccu CLK_UART9>;
+			clocks = <&ccu CLK_UART9>, <&ccu CLK_SLOW_UART>;
+			clock-names = "func", "gate";
 			clk-fpga = <14750000>;
 			resets = <&reset RESET_UART9>;
 			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
@@ -1028,7 +1002,8 @@
 			dmas = <&pdma0 19 1
 				&pdma0 18 1>;
 			dma-names = "rx", "tx";
-			/* k1x,ssp-lpm-qos = <PM_QOS_CPUIDLE_BLOCK_AXI>; */
+			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
+			cpuidle,pm-runtime,sleep;
 			interrupt-parent = <&intc>;
 			interrupts = <56>;
 			clocks = <&ccu CLK_SSPA0>;
@@ -1048,7 +1023,8 @@
 			dmas = <&pdma0 21 1
 				&pdma0 20 1>;
 			dma-names = "rx", "tx";
-			/* k1x,ssp-lpm-qos = <PM_QOS_CPUIDLE_BLOCK_AXI>; */
+			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
+			cpuidle,pm-runtime,sleep;
 			interrupt-parent = <&intc>;
 			interrupts = <57>;
 			clocks = <&ccu CLK_SSPA1>;
@@ -1068,7 +1044,8 @@
 			dmas = <&pdma0 17 1
 				&pdma0 16 1>;
 			dma-names = "rx", "tx";
-			/* k1x,ssp-lpm-qos = <PM_QOS_CPUIDLE_BLOCK_AXI>; */
+			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
+			cpuidle,pm-runtime,sleep;
 			interrupt-parent = <&intc>;
 			interrupts = <55>;
 			clocks = <&ccu CLK_SSP3>;
@@ -1092,8 +1069,8 @@
 			clocks = <&ccu CLK_TWSI0>;
 			resets = <&reset RESET_TWSI0>;
 			/*
-			dmas = <&pdma0 AP2_I2C0_RX 1
-				&pdma0 AP2_I2C0_TX 1>;
+			dmas = <&pdma0 DMA_I2C0_RX 1
+				&pdma0 DMA_I2C0_TX 1>;
 			dma-names = "rx", "tx";
 			*/
 			spacemit,dma-disable;
@@ -1124,8 +1101,8 @@
                         clocks = <&ccu CLK_TWSI1>;
                         resets = <&reset RESET_TWSI1>;
                         /*
-                        dmas = <&pdma0 AP2_I2C1_RX 1
-                                &pdma0 AP2_I2C1_TX 1>;
+                        dmas = <&pdma0 DMA_I2C1_RX 1
+                                &pdma0 DMA_I2C1_TX 1>;
                         dma-names = "rx", "tx";
                         */
                         spacemit,dma-disable;
@@ -1156,8 +1133,8 @@
                         clocks = <&ccu CLK_TWSI2>;
                         resets = <&reset RESET_TWSI2>;
                         /*
-                        dmas = <&pdma0 AP2_I2C2_RX 1
-                                &pdma0 AP2_I2C2_TX 1>;
+                        dmas = <&pdma0 DMA_I2C2_RX 1
+                                &pdma0 DMA_I2C2_TX 1>;
                         dma-names = "rx", "tx";
                         */
                         spacemit,dma-disable;
@@ -1185,11 +1162,6 @@
                         #size-cells = <0>;
                         interrupt-parent = <&intc>;
                         interrupts = <39>;
-                        /*
-                        dmas = <&pdma0 AP2_I2C3_RX 1
-                                &pdma0 AP2_I2C3_TX 1>;
-                        dma-names = "rx", "tx";
-                        */
                         spacemit,dma-disable;
                         spacemit,i2c-fast-mode;
                         /* spacemit,i2c-high-mode; */
@@ -1218,8 +1190,8 @@
 			clocks = <&ccu CLK_TWSI4>;
                         resets = <&reset RESET_TWSI4>;
 			/*
-			dmas = <&pdma0 AP2_I2C4_RX 1
-				&pdma0 AP2_I2C4_TX 1>;
+			dmas = <&pdma0 DMA_I2C4_RX 1
+				&pdma0 DMA_I2C4_TX 1>;
 			dma-names = "rx", "tx";
 			*/
 			spacemit,dma-disable;
@@ -1250,8 +1222,8 @@
                         clocks = <&ccu CLK_TWSI5>;
                         resets = <&reset RESET_TWSI5>;
                         /*
-                        dmas = <&pdma0 AP2_I2C5_RX 1
-                                &pdma0 AP2_I2C5_TX 1>;
+                        dmas = <&pdma0 DMA_I2C5_RX 1
+                                &pdma0 DMA_I2C5_TX 1>;
                         dma-names = "rx", "tx";
                         */
                         spacemit,dma-disable;
@@ -1282,8 +1254,8 @@
 			clocks = <&ccu CLK_TWSI6>;
                         resets = <&reset RESET_TWSI6>;
 			/*
-			dmas = <&pdma0 AP_I2C6_RX 1
-				&pdma0 AP_I2C6_TX 1>;
+			dmas = <&pdma0 DMA_I2C6_RX 1
+				&pdma0 DMA_I2C6_TX 1>;
 			dma-names = "rx", "tx";
 			*/
 			spacemit,dma-disable;
@@ -1314,8 +1286,8 @@
 			clocks = <&ccu CLK_TWSI7>;
                         resets = <&reset RESET_TWSI7>;
 			/*
-			dmas = <&pdma0 AP_I2C7_RX 1
-				&pdma0 AP_I2C7_TX 1>;
+			dmas = <&pdma0 DMA_I2C7_RX 1
+				&pdma0 DMA_I2C7_TX 1>;
 			dma-names = "rx", "tx";
 			*/
 			spacemit,dma-disable;
@@ -1346,8 +1318,8 @@
                         clocks = <&ccu CLK_TWSI8>;
                         resets = <&reset RESET_TWSI8>;
                         /*
-                        dmas = <&pdma0 AP_I2C8_RX 1
-                                &pdma0 AP_I2C8_TX 1>;
+                        dmas = <&pdma0 DMA_I2C8_RX 1
+                                &pdma0 DMA_I2C8_TX 1>;
                         dma-names = "rx", "tx";
                         */
                         spacemit,dma-disable;
@@ -1616,7 +1588,6 @@
 			interrupts = <35>;
 			interrupt-parent = <&intc>;
 			spa,wdt-disabled;
-			spa,wdt-enable-restart-handler;
 			status = "ok";
 		};
 
@@ -1660,6 +1631,8 @@
 			clocks = <&ccu CLK_GPIO>;
 			interrupt-names = "gpio_mux";
 			interrupt-parent = <&intc>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
 
 			gcb0: gpio0 {
 				reg-offset = <0x0>;
@@ -1694,7 +1667,9 @@
 			mac-address = [ 00 00 00 00 00 00 ];
 			ptp-support;
 			ptp-clk-rate = <10000000>;
-			lpm-qos = <7>;
+			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
+			clk,pm-runtime,no-sleep;
+			cpuidle,pm-runtime,sleep;
 			interconnects = <&dram_range1>;
 			interconnect-names = "dma-mem";
 			status = "disabled";
@@ -1716,7 +1691,9 @@
 			mac-address = [ 00 00 00 00 00 00 ];
 			ptp-support;
 			ptp-clk-rate = <10000000>;
-			lpm-qos = <7>;
+			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
+			clk,pm-runtime,no-sleep;
+			cpuidle,pm-runtime,sleep;
 			interconnects = <&dram_range1>;
 			interconnect-names = "dma-mem";
 			status = "disabled";
@@ -1736,8 +1713,6 @@
 		usbphy: usbphy@c0940000 {
 			compatible = "spacemit,usb2-phy";
 			reg = <0x0 0xc0940000 0x0 0x200>;
-			spacemit,phy-name = "mv-usb-phy";
-			spacemit,pll-lock-bypass;
 			clocks = <&ccu CLK_USB_AXI>;
 			status = "disabled";
 		};
@@ -1783,14 +1758,14 @@
 			clocks = <&ccu CLK_USB_AXI>;
 			usb-phy = <&usbphy>;
 			usb-otg = <&otg>;
+			interconnects = <&dram_range0>;
+			interconnect-names = "dma-mem";
 			status = "disabled";
 		};
 
 		usbphy1: usbphy1@c09c0000 {
 			compatible = "spacemit,usb2-phy";
 			reg = <0x0 0xc09c0000 0x0 0x200>;
-			spacemit,phy-name = "mv-usb-phy";
-			spacemit,pll-lock-bypass;
 			clocks = <&ccu CLK_USB_P1>;
 			status = "disabled";
 		};
@@ -1824,8 +1799,7 @@
 		usb2phy: usb2phy@0xc0a30000 {
 			compatible = "spacemit,usb2-phy";
 			reg = <0x0 0xc0a30000  0x0 0x200>;
-			spacemit,phy-name = "mv-usb-phy";
-			spacemit,pll-lock-bypass;
+			spacemit,handle_connect_change;
 			clocks = <&ccu CLK_USB30>;
 			status = "disabled";
 		};
@@ -1938,6 +1912,7 @@
 			clock-names = "pcie-clk";
 			resets = <&reset RESET_PCIE0>;
 			reset-names = "pcie-reset";
+			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
 
 			bus-range = <0x00 0xff>;
 			max-link-speed = <2>;
@@ -1948,7 +1923,7 @@
 			#size-cells = <2>;
 			ranges = <0x01000000 0x0 0x80002000 0 0x80002000 0x0 0x100000>,
 				<0x02000000 0x0 0x80102000 0 0x80102000 0x0 0x0f000000>;
-			interconnects = <&dram_range1>;
+			interconnects = <&dram_range2>;
 			interconnect-names = "dma-mem";
 
 			interrupts = <141>, <145>;
@@ -1986,6 +1961,7 @@
 			clock-names = "pcie-clk";
 			resets = <&reset RESET_PCIE1>;
 			reset-names = "pcie-reset";
+			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
 
 			bus-range = <0x00 0xff>;
 			max-link-speed = <2>;
@@ -1996,7 +1972,7 @@
 			#size-cells = <2>;
 			ranges = <0x01000000 0x0 0x90002000 0 0x90002000 0x0 0x100000>,
 				<0x02000000 0x0 0x90102000 0 0x90102000 0x0 0x0f000000>;
-			interconnects = <&dram_range1>;
+			interconnects = <&dram_range2>;
 			interconnect-names = "dma-mem";
 
 			interrupts = <142>, <146>;
@@ -2034,6 +2010,7 @@
 			clock-names = "pcie-clk";
 			resets = <&reset RESET_PCIE2>;
 			reset-names = "pcie-reset";
+			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
 
 			bus-range = <0x00 0xff>;
 			max-link-speed = <2>;
@@ -2044,7 +2021,7 @@
 			#size-cells = <2>;
 			ranges = <0x01000000 0x0 0xa0002000 0 0xa0002000 0x0 0x100000>,
 				<0x02000000 0x0 0xa0102000 0 0xa0102000 0x0 0x10000000>;
-			interconnects = <&dram_range1>;
+			interconnects = <&dram_range2>;
 			interconnect-names = "dma-mem";
 
 			interrupts = <143>, <147>;
@@ -2127,25 +2104,19 @@
 
 				trips {
 					cls0_trip0: cls0-trip-point0 {
-						temperature = <55000>;
+						temperature = <95000>;
 						hysteresis = <5000>;
 						type = "passive";
 					};
 
 					cls0_trip1: cls0-trip-point1 {
-						temperature = <70000>;
+						temperature = <105000>;
 						hysteresis = <5000>;
 						type = "passive";
 					};
 
 					cls0_trip2: cls0-trip-point2 {
-						temperature = <85000>;
-						hysteresis = <5000>;
-						type = "passive";
-					};
-
-					cls0_trip3: cls0-trip-point3 {
-						temperature = <105000>;
+						temperature = <115000>;
 						hysteresis = <5000>;
 						type = "critical";
 					};
@@ -2153,7 +2124,10 @@
 
 				cooling-maps {
 					map0 {
-						trip = <&cls0_trip1>;
+						trip = <&cls0_trip0>;
+/*
+						cooling-device = <&{/cpus/cpu@3/thermal-hotplug} 0 1>;
+*/
 						cooling-device = <&cpu_0 1 2>,
 								 <&cpu_1 1 2>,
 								 <&cpu_2 1 2>,
@@ -2161,17 +2135,14 @@
 					};
 
 					map1 {
-						trip = <&cls0_trip2>;
-						cooling-device = <&cpu_0 3 4>,
-								 <&cpu_1 3 4>,
-								 <&cpu_2 3 4>,
-								 <&cpu_3 3 4>;
-					};
-
-					map2 {
-						trip = <&cls0_trip2>;
-						cooling-device = <&{/cpus/cpu@2/thermal-idle} 0 15>,
-							<&{/cpus/cpu@3/thermal-idle} 0 15>;
+						trip = <&cls0_trip1>;
+/*
+						cooling-device = <&{/cpus/cpu@3/thermal-hotplug} 0 1>;
+*/
+						cooling-device = <&cpu_0 3 3>,
+								 <&cpu_1 3 3>,
+								 <&cpu_2 3 3>,
+								 <&cpu_3 3 3>;
 					};
 				};
 			};
@@ -2183,25 +2154,19 @@
 
 				trips {
 					cls1_trip0: cls1-trip-point0 {
-						temperature = <55000>;
+						temperature = <95000>;
 						hysteresis = <5000>;
 						type = "passive";
 					};
 
 					cls1_trip1: cls1-trip-point1 {
-						temperature = <70000>;
+						temperature = <105000>;
 						hysteresis = <5000>;
 						type = "passive";
 					};
 
 					cls1_trip2: cls1-trip-point2 {
-						temperature = <85000>;
-						hysteresis = <5000>;
-						type = "passive";
-					};
-
-					cls1_trip3: cls1-trip-point3 {
-						temperature = <105000>;
+						temperature = <115000>;
 						hysteresis = <5000>;
 						type = "critical";
 					};
@@ -2209,7 +2174,10 @@
 
 				cooling-maps {
 					map0 {
-						trip = <&cls1_trip1>;
+						trip = <&cls1_trip0>;
+/*
+						cooling-device = <&{/cpus/cpu@7/thermal-hotplug} 0 1>;
+*/
 						cooling-device = <&cpu_4 1 2>,
 								 <&cpu_5 1 2>,
 								 <&cpu_6 1 2>,
@@ -2217,20 +2185,16 @@
 					};
 
 					map1 {
-						trip = <&cls1_trip2>;
-						cooling-device = <&cpu_4 3 4>,
-								 <&cpu_5 3 4>,
-								 <&cpu_6 3 4>,
-								 <&cpu_7 3 4>;
-					};
-
-					map2 {
-						trip = <&cls1_trip2>;
-						cooling-device = <&{/cpus/cpu@6/thermal-idle} 0 15>,
-							<&{/cpus/cpu@7/thermal-idle} 0 15>;
+						trip = <&cls1_trip1>;
+/*
+						cooling-device = <&{/cpus/cpu@7/thermal-hotplug} 0 1>;
+*/
+						cooling-device = <&cpu_4 3 3>,
+								 <&cpu_5 3 3>,
+								 <&cpu_6 3 3>,
+								 <&cpu_7 3 3>;
 					};
 				};
-
 			};
 		};
 
@@ -2314,171 +2278,8 @@
 			page-size = <4>;
 			interconnects = <&dram_range1>;
 			interconnect-names = "dma-mem";
+			clk,pm-runtime,no-sleep;
 			status = "okay";
-		};
-
-		display-subsystem-dsi {
-			compatible = "spacemit,saturn-le";
-			reg = <0 0xC0340000 0 0x2A000>;
-			ports = <&dpu_online2_dsi>;
-		};
-
-		display-subsystem-hdmi {
-			compatible = "spacemit,saturn-hdmi";
-			reg = <0 0xc0440000 0 0x2A000>;
-			ports = <&dpu_online2_hdmi>;
-		};
-
-		dpu_online2_dsi: port@c0340000 {
-			compatible = "spacemit,dpu-online2";
-			interrupt-parent = <&intc>;
-			interrupts = <90>, <89>;
-			interrupt-names = "ONLINE_IRQ", "OFFLINE_IRQ";
-			clocks = <&ccu CLK_DPU_PXCLK>,
-				<&ccu CLK_DPU_MCLK>,
-				<&ccu CLK_DPU_HCLK>,
-				<&ccu CLK_DPU_ESC>,
-				<&ccu CLK_DPU_BIT>;
-			clock-names = "pxclk", "mclk", "hclk", "escclk", "bitclk";
-			assigned-clocks = <&ccu CLK_DPU_PXCLK>,
-				<&ccu CLK_DPU_MCLK>,
-				<&ccu CLK_DPU_HCLK>,
-				<&ccu CLK_DPU_ESC>,
-				<&ccu CLK_DPU_BIT>;
-			assigned-clock-parents = <&ccu CLK_PLL1_614>,
-				<&ccu CLK_PLL1_307P2>,
-				<0>,
-				<&ccu CLK_PLL1_51P2_AP>,
-				<&ccu CLK_PLL1_1228>;
-			resets = <&reset RESET_MIPI>,
-				<&reset RESET_LCD_MCLK>,
-				<&reset RESET_LCD>,
-				<&reset RESET_DSI_ESC>;
-			reset-names= "dsi_reset", "mclk_reset", "lcd_reset","esc_reset";
-			power-domains = <&power K1X_PMU_LCD_PWR_DOMAIN>;
-			pipeline-id = <ONLINE2>;
-			ip = "spacemit-saturn";
-			spacemit-dpu-min-mclk = <40960000>;
-			status = "disabled";
-
-			dpu_online2_dsi_out: endpoint@0 {
-				remote-endpoint = <&dsi2_in>;
-			};
-
-			/*
-			dpu_offline0_dsi_out: endpoint@1 {
-				remote-endpoint = <&wb0_in>;
-			};
-			*/
-		};
-
-		dsi2: dsi2@d421a800 {
-			compatible = "spacemit,dsi2-host";
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <0 0xD421A800 0 0x200>;
-			interrupt-parent = <&intc>;
-			interrupts = <95>;
-			ip = "synopsys-dhost";
-			dev-id = <2>;
-			status = "disabled";
-
-			ports {
-				#address-cells = <1>;
-				#size-cells = <0>;
-
-				port@0 {
-					reg = <0>;
-					dsi2_out: endpoint {
-						remote-endpoint = <&dphy2_in>;
-					};
-				};
-
-				port@1 {
-					reg = <1>;
-					dsi2_in: endpoint {
-						remote-endpoint = <&dpu_online2_dsi_out>;
-					};
-				};
-
-			};
-		};
-
-		dphy2: dphy2@d421a800 {
-			compatible = "spacemit,dsi2-phy";
-			#address-cells = <1>;
-			#size-cells = <0>;
-			reg = <0 0xD421A800 0 0x200>;
-			ip = "spacemit-dphy";
-			dev-id = <2>;
-			status = "okay";
-
-			port@1 {
-				reg = <1>;
-				dphy2_in: endpoint {
-					remote-endpoint = <&dsi2_out>;
-				};
-			};
-		};
-
-		wb0 {
-			compatible = "spacemit,wb0";
-			dev-id = <2>;
-			status = "okay";
-
-			ports {
-				#address-cells = <1>;
-				#size-cells = <0>;
-				port@0 {
-					reg = <0>;
-					wb0_in: endpoint {
-						// remote-endpoint = <&dpu_offline0_dsi_out>;
-						remote-endpoint = <&dpu_offline0_hdmi_out>;
-					};
-				};
-			};
-		};
-
-		dpu_online2_hdmi: port@c0440000 {
-			compatible = "spacemit,dpu-online2";
-			interrupt-parent = <&intc>;
-			interrupts = <139>, <138>;
-			interrupt-names = "ONLINE_IRQ", "OFFLINE_IRQ";
-			clocks = <&ccu CLK_HDMI>;
-			clock-names = "hmclk";
-			assigned-clocks = <&ccu CLK_HDMI>;
-			assigned-clock-parents = <&ccu CLK_PLL1_491>;
-			assigned-clock-rates = <491520000>;
-			resets = <&reset RESET_HDMI>;
-			reset-names= "hdmi_reset";
-			power-domains = <&power K1X_PMU_HDMI_PWR_DOMAIN>;
-			pipeline-id = <ONLINE2>;
-			ip = "spacemit-saturn";
-			status = "disabled";
-
-			dpu_online2_hdmi_out: endpoint@0 {
-				remote-endpoint = <&hdmi_in>;
-			};
-
-			dpu_offline0_hdmi_out: endpoint@1 {
-				remote-endpoint = <&wb0_in>;
-			};
-
-		};
-
-		hdmi: hdmi@C0400500 {
-			compatible = "spacemit,hdmi";
-			reg = <0 0xC0400500 0 0x200>;
-			status = "disabled";
-
-			port {
-				#address-cells = <1>;
-				#size-cells = <0>;
-				hdmi_in: endpoint@0 {
-					reg = <0>;
-					remote-endpoint = <&dpu_online2_hdmi_out>;
-				};
-			};
 		};
 
 		pwm_bl: lcd_backlight {
@@ -2503,13 +2304,15 @@
 		};
 
 		spacemit_crypto_engine@d8600000 {
-                        compatible = "spacemit,crypto_engine";
-                        spacemit-crypto-engine-0 = <0xd8600000 0x00100000>;
-                        interrupt-parent = <&intc>;
-                        interrupts = <113>;
-                        num-engines = <1>;
-                        status = "okay";
-                };
+			compatible = "spacemit,crypto_engine";
+			spacemit-crypto-engine-0 = <0xd8600000 0x00100000>;
+			interrupt-parent = <&intc>;
+			interrupts = <113>;
+			num-engines = <1>;
+			clocks = <&ccu CLK_AES>;
+			resets = <&reset RESET_AES>;
+			status = "okay";
+		};
 
 		ciu: ciu@d4282c00 {
 			compatible = "spacemit,aquila-ciu", "spacemit,ciu", "syscon";
@@ -2583,11 +2386,55 @@
 		compatible = "spacemit,spacemit-snd-sspa";
 		reg = <0 0xc0883900 0 0x300>,
 			<0 0xc0882000 0 0x50>;
+		clocks = <&ccu CLK_RCPU_HDMIAUDIO>;
+		resets = <&reset RESET_RCPU_HDMIAUDIO>;
+		assigned-clocks = <&ccu CLK_RCPU_HDMIAUDIO>;
+		assigned-clock-rates = <48000>;
+		power-domains = <&power K1X_PMU_DUMMY_PWR_DOMAIN>;
 		status = "ok";
 	};
 
-	sound: snd-card@0 {
-		compatible = "spacemit,spacemit-snd";
+	spacemit_i2s: i2s {
+		compatible = "spacemit,spacemit-i2s-dai";
+		reg = <0x0 0xD4026000 0x0 0x30>,
+			<0x0 0xD4026800 0x0 0x30>;
+		reg-names = "i2s0", "i2s1";
+		clocks = <&ccu CLK_SSPA0>,
+			<&ccu CLK_SSPA1>;
+		clock-names = "sspa0-clk", "sspa1-clk";
+		resets = <&reset RESET_SSPA0>,
+			<&reset RESET_SSPA1>;
+		reset-names = "sspa0-rst", "sspa1-rst";
+		assigned-clocks = <&ccu CLK_SSPA0>,
+				 <&ccu CLK_SSPA1>;
+		assigned-clock-rates = <3072000>, <3072000>;
+		power-domains = <&power K1X_PMU_DUMMY_PWR_DOMAIN>;
 		status = "ok";
+	};
+
+	spacemit-snd-dma0 {
+		compatible = "spacemit,spacemit-snd-dma0";
+		dmas = <&pdma0 22 1
+			&pdma0 21 1>;
+		dma-names = "rx", "tx";
+		status = "ok";
+	};
+
+	spacemit-snd-dma1 {
+		compatible = "spacemit,spacemit-snd-dma1";
+		dmas = <&pdma0 24 1
+			&pdma0 23 1>;
+		dma-names = "rx", "tx";
+		status = "ok";
+	};
+
+	sound_hdmi: snd-card@0 {
+		compatible = "spacemit,spacemit-snd-hdmi";
+		status = "ok";
+	};
+
+	sound_es8326: snd-card@1 {
+		compatible = "spacemit,spacemit-snd-es8326";
+		status = "disabled";
 	};
 };

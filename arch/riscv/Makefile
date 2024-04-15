@@ -144,7 +144,7 @@ ifeq ($(CONFIG_RISCV_M_MODE)$(CONFIG_SOC_CANAAN),yy)
 KBUILD_IMAGE := $(boot)/loader.bin
 else
 ifeq ($(CONFIG_EFI_ZBOOT),)
-KBUILD_IMAGE := $(boot)/Image.gz
+KBUILD_IMAGE := $(boot)/Image.gz.itb
 else
 KBUILD_IMAGE := $(boot)/vmlinuz.efi
 endif
@@ -152,14 +152,20 @@ endif
 endif
 BOOT_TARGETS := Image Image.gz loader loader.bin xipImage vmlinuz.efi
 
-all:	$(notdir $(KBUILD_IMAGE))
+#
+# extra files
+#
+include $(srctree)/arch/riscv/generic/Platform
+bootvars-y	= ITS_INPUTS="$(its-y)"
+
+all:	$(notdir $(KBUILD_IMAGE)) Image.itb Image.gz.itb
 
 $(BOOT_TARGETS): vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 	@$(kecho) '  Kernel: $(boot)/$@ is ready'
 
-Image.%: Image
-	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
+Image.%: Image Image.gz
+	$(Q)$(MAKE) $(build)=$(boot) $(bootvars-y) $(boot)/$@
 
 install: KBUILD_IMAGE := $(boot)/Image
 zinstall: KBUILD_IMAGE := $(boot)/Image.gz

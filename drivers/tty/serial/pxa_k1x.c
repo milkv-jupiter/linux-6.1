@@ -57,7 +57,7 @@
 
 #define UARTCLK_FPGA		(14750000)
 
-#define NUM_UART_PORTS		(9)
+#define NUM_UART_PORTS		(10)
 #define BT_UART_PORT		(2)
 
 #define UART_FCR_PXA_BUS32	(0x20)	/* 32-Bit Peripheral Bus */
@@ -146,19 +146,6 @@ static unsigned int serial_pxa_tx_empty(struct uart_port *port);
 #ifdef CONFIG_PM
 static void _pxa_timer_handler(struct uart_pxa_port *up);
 #endif
-
-
-static int uart_dma;
-
-static int __init uart_dma_setup(char *__unused)
-{
-#ifdef CONFIG_MMP_PDMA_SPACEMIT_K1X
-	uart_dma = 1;
-#endif
-	return 1;
-}
-
-__setup("uart_dma", uart_dma_setup);
 
 static inline void stop_dma(struct uart_pxa_port *up, int read)
 {
@@ -2018,7 +2005,7 @@ static const struct dev_pm_ops serial_pxa_pm_ops = {
 static void _pxa_timer_handler(struct uart_pxa_port *up)
 {
 #if SUPPORT_POWER_QOS
-	pm_runtime_get_sync(up->port.dev);
+	pm_runtime_put_sync(up->port.dev);
 #endif
 	if (up->port.line == BT_UART_PORT) {
 		pr_info("bluesleep: %s: release qos\n", __func__);
@@ -2056,7 +2043,7 @@ static void uart_tx_lpm_handler(struct work_struct *work)
 		usleep_range(1000, 2000);
 	}
 #if SUPPORT_POWER_QOS
-	pm_runtime_get_sync(up->port.dev);
+	pm_runtime_put_sync(up->port.dev);
 #endif
 }
 #endif
@@ -2076,7 +2063,7 @@ static int serial_pxa_probe_dt(struct platform_device *pdev, struct uart_pxa_por
 	}
 
 	/* device tree is used */
-	if (uart_dma) {
+	if (of_get_property(np, "dmas", NULL)) {
 		sport->dma_enable = 1;
 	}
 	ret = of_alias_get_id(np, "serial");
@@ -2208,7 +2195,7 @@ static int serial_pxa_probe(struct platform_device *dev)
 
 	dma_set_mask(&dev->dev, DMA_BIT_MASK(64));
 	dma_set_coherent_mask(&dev->dev, DMA_BIT_MASK(64));
-	if (ret > 0 && uart_dma) {
+	if (ret > 0 && sport->dma_enable) {
 		/* Get Rx DMA mapping value */
 		dmares = platform_get_resource(dev, IORESOURCE_DMA, 0);
 		if (dmares) {
@@ -2232,8 +2219,8 @@ static int serial_pxa_probe(struct platform_device *dev)
 
 #ifdef CONFIG_PM
 #if SUPPORT_POWER_QOS
-	pm_runtime_set_active(&dev->dev);
 	pm_runtime_enable(&dev->dev);
+	pm_runtime_set_active(&dev->dev);
 	pm_runtime_irq_safe(&dev->dev);
 #endif
 #endif

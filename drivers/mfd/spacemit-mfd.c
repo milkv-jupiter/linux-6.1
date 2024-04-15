@@ -8,6 +8,7 @@
 #include <linux/regmap.h>
 #include <linux/reboot.h>
 #include <linux/ioport.h>
+#include <linux/pm_wakeirq.h>
 #include <linux/mfd/spacemit/spacemit_pmic.h>
 
 SPM8821_REGMAP_CONFIG;
@@ -56,13 +57,25 @@ static void spacemit_pm_power_off(void)
 
 static int spacemit_restart_notify(struct notifier_block *this, unsigned long mode, void *cmd)
 {
-	/* TODO */
+	int ret;
+	struct spacemit_pmic *pmic = (struct spacemit_pmic *)match_data->ptr;
+
+	ret = regmap_update_bits(pmic->regmap, match_data->reboot.reg,
+			match_data->reboot.bit, match_data->reboot.bit);
+	if (ret) {
+		pr_err("Failed to reboot device!\n");
+	}
+
+	while (1) {
+		asm volatile ("wfi");
+	}
+
 	return NOTIFY_DONE;
 }
 
 static struct notifier_block spacemit_restart_handler = {
 	.notifier_call = spacemit_restart_notify,
-	.priority = 192,
+	.priority = 0,
 };
 
 static int spacemit_prepare_sub_pmic(struct spacemit_pmic *pmic)
@@ -167,6 +180,9 @@ static int spacemit_pmic_probe(struct i2c_client *client,
 				return ret;
 			}
 		}
+
+		dev_pm_set_wake_irq(&client->dev, client->irq);
+		device_init_wakeup(&client->dev, true);
 	}
 
 	ret = devm_mfd_add_devices(&client->dev, PLATFORM_DEVID_NONE,
@@ -209,6 +225,10 @@ static struct i2c_driver spacemit_pmic_i2c_driver = {
 	.shutdown = spacemit_pmic_shutdown,
 };
 
-module_i2c_driver(spacemit_pmic_i2c_driver);
+static int spacemit_mfd_init(void)
+{
+	return i2c_add_driver(&spacemit_pmic_i2c_driver);
+}
+subsys_initcall(spacemit_mfd_init);
 
 MODULE_LICENSE("GPL");

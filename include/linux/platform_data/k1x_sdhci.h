@@ -51,6 +51,7 @@ struct rx_tuning {
 
 	u32 card_cid[4];
 	u8 window_limit;
+	u8 tuning_fail;
 };
 
 /*
@@ -81,6 +82,7 @@ struct k1x_sdhci_platdata {
 
 	u8 tx_dline_reg;
 	u8 tx_delaycode;
+	u8 phy_driver_sel;
 	struct rx_tuning rxtuning;
 	u8 need_reset_dllcfg1;
 	u32 prev_dllcfg1;

@@ -45,6 +45,7 @@
  * There's one bit for each interrupt source.
  */
 #ifdef CONFIG_SOC_SPACEMIT
+#define PENDING_BASE			0x1000
 #define CONTEXT_ENABLE_BASE		0x2080
 #define CONTEXT_ENABLE_SIZE		0x100
 #else
@@ -167,7 +168,13 @@ static void plic_irq_eoi(struct irq_data *d)
 {
 	struct plic_handler *handler = this_cpu_ptr(&plic_handlers);
 
-	writel(d->hwirq, handler->hart_base + CONTEXT_CLAIM);
+	if (unlikely(irqd_irq_disabled(d))) {
+		plic_toggle(handler, d->hwirq, 1);
+		writel(d->hwirq, handler->hart_base + CONTEXT_CLAIM);
+		plic_toggle(handler, d->hwirq, 0);
+	} else {
+		writel(d->hwirq, handler->hart_base + CONTEXT_CLAIM);
+	}
 }
 
 #ifdef CONFIG_SMP
@@ -210,7 +217,11 @@ static struct irq_chip plic_edge_chip = {
 	.irq_set_affinity = plic_set_affinity,
 #endif
 	.irq_set_type	= plic_irq_set_type,
+#ifdef CONFIG_SOC_SPACEMIT
+	.flags		= IRQCHIP_AFFINITY_PRE_STARTUP | IRQCHIP_ENABLE_WAKEUP_ON_SUSPEND | IRQCHIP_SKIP_SET_WAKE,
+#else
 	.flags		= IRQCHIP_AFFINITY_PRE_STARTUP,
+#endif
 };
 
 static struct irq_chip plic_chip = {
@@ -224,7 +235,11 @@ static struct irq_chip plic_chip = {
 	.irq_set_affinity = plic_set_affinity,
 #endif
 	.irq_set_type	= plic_irq_set_type,
+#ifdef CONFIG_SOC_SPACEMIT
+	.flags		= IRQCHIP_AFFINITY_PRE_STARTUP | IRQCHIP_ENABLE_WAKEUP_ON_SUSPEND | IRQCHIP_SKIP_SET_WAKE,
+#else
 	.flags		= IRQCHIP_AFFINITY_PRE_STARTUP,
+#endif
 };
 
 static int plic_irq_set_type(struct irq_data *d, unsigned int type)
@@ -475,6 +490,10 @@ static int __init __plic_init(struct device_node *node,
 done:
 		for (hwirq = 1; hwirq <= nr_irqs; hwirq++) {
 			plic_toggle(handler, hwirq, 0);
+			#ifdef CONFIG_SOC_SPACEMIT
+			/* clear pending, which maybe triggered by uboot */
+			writel(0, priv->regs + PENDING_BASE + (hwirq/32)*4);
+			#endif
 			writel(1, priv->regs + PRIORITY_BASE +
 				  hwirq * PRIORITY_PER_ID);
 		}

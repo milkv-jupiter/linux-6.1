@@ -20,9 +20,9 @@
 #define CAM_MODULE_TAG CAM_MDL_CPP
 
 #ifdef CONFIG_SPACEMIT_FPGA
-#define CPP_RESET_TIMEOUT_MS (100)
+#define CPP_RESET_TIMEOUT_MS (1000)
 #else
-#define CPP_RESET_TIMEOUT_MS (50)
+#define CPP_RESET_TIMEOUT_MS (500)
 #endif
 
 static void cpp20_3dnr_src_dmad_cfg(struct cpp_device *cpp_dev,
@@ -230,8 +230,8 @@ static void set_3dnr_rd_burst(struct cpp_device *cpp, u8 val)
 }
 
 /**
- * no more than 0x40 on dove_z1, or hardware hang when axi slow
- * fixed on dove_a0
+ * no more than 0x40 on z1, or hardware hang when axi slow
+ * fixed on asic_a0
 
  * val: burst length=val*16 byte
  */

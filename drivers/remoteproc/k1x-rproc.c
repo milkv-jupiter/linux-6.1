@@ -3,6 +3,8 @@
 #include <linux/limits.h>
 #include <linux/module.h>
 #include <linux/io.h>
+#include <linux/regmap.h>
+#include <linux/mfd/syscon.h>
 #include <linux/of_device.h>
 #include <linux/of_reserved_mem.h>
 #include <linux/pm_runtime.h>
@@ -10,8 +12,17 @@
 #include <linux/reset.h>
 #include <linux/clk.h>
 #include <linux/clkdev.h>
+#include <linux/kthread.h>
 #include <linux/clk-provider.h>
 #include <linux/mailbox_client.h>
+#include <linux/completion.h>
+#include <linux/freezer.h>
+#include <uapi/linux/sched/types.h>
+#include <uapi/linux/sched.h>
+#include <linux/sched/prio.h>
+#include <linux/rpmsg.h>
+#include <linux/pm_qos.h>
+#include <linux/syscore_ops.h>
 #include "remoteproc_internal.h"
 
 #define MAX_MEM_BASE	2
@@ -29,11 +40,24 @@
 
 #define ESOS_DDR_REGMAP_BASE_REG_OFFSET	0xc0
 
+#define APMU_AUDIO_CLK_RES_CTRL	0x14c
+#define APMU_AUDIO_POWER_STATUS_OFFSET	23
+
+#define DEV_PM_QOS_CLK_GATE            1
+#define DEV_PM_QOS_REGULATOR_GATE      2
+#define DEV_PM_QOS_PM_DOMAIN_GATE      4
+#define DEV_PM_QOS_DEFAULT             7
+
+struct dev_pm_qos_request greq;
+struct reset_control *gcore_reset;
+
 struct spacemit_mbox {
 	const char name[10];
 	struct mbox_chan *chan;
 	struct mbox_client client;
-	struct work_struct vq_work;
+	struct task_struct *mb_thread;
+	bool kthread_running;
+	struct completion mb_comp;
 	int vq_id;
 };
 
@@ -44,7 +68,9 @@ struct spacemit_rproc {
 	unsigned int ddr_remap_base;
 	void __iomem *base[MAX_MEM_BASE];
 	struct spacemit_mbox *mb;
-	struct workqueue_struct *workqueue;
+#ifdef CONFIG_PM_SLEEP
+	struct rpmsg_device *rpdev;
+#endif
 };
 
 static int spacemit_rproc_mem_alloc(struct rproc *rproc,
@@ -53,12 +79,14 @@ static int spacemit_rproc_mem_alloc(struct rproc *rproc,
 	void __iomem *va = NULL;
 
 	dev_dbg(&rproc->dev, "map memory: %pa+%zx\n", &mem->dma, mem->len);
-	va = ioremap_wc(mem->dma, mem->len);
+	va = ioremap(mem->dma, mem->len);
 	if (!va) {
 		dev_err(&rproc->dev, "Unable to map memory region: %pa+%zx\n",
 			&mem->dma, mem->len);
 		return -ENOMEM;
 	}
+
+	memset(va, 0, mem->len);
 
 	/* Update memory entry va */
 	mem->va = va;
@@ -89,8 +117,19 @@ static int spacemit_rproc_prepare(struct rproc *rproc)
 
 	/* de-assert the audio module */
 	reset_control_deassert(priv->core_rst);
+
+	/* open the clk & pm-switch using pm-domain framework */
+	dev_pm_qos_add_request(priv->dev, &greq, DEV_PM_QOS_MAX_FREQUENCY,
+			DEV_PM_QOS_CLK_GATE | DEV_PM_QOS_PM_DOMAIN_GATE);
+
 	/* enable the power-switch and the clk */
 	pm_runtime_get_sync(priv->dev);
+
+	/**
+	* do not disable the clk & power-switch of the rcpu, it will be done
+	* by rcpu itself
+	* */
+	dev_pm_qos_update_request(&greq, 0);
 
 	/* Register associated reserved memory regions */
 	of_phandle_iterator_init(&it, np, "memory-region", NULL, 0);
@@ -234,22 +273,32 @@ static struct rproc_ops spacemit_rproc_ops = {
 	.get_boot_addr	= spacemit_get_boot_addr,
 };
 
-static void k1x_rproc_mb_vq_work(struct work_struct *work)
+static int __process_theread(void *arg)
 {
-	struct spacemit_mbox *mb = container_of(work, struct spacemit_mbox, vq_work);
-	struct rproc *rproc = dev_get_drvdata(mb->client.dev);
-
-	if (rproc_vq_interrupt(rproc, mb->vq_id) == IRQ_NONE)
-		dev_dbg(&rproc->dev, "no message found in vq%d\n", mb->vq_id);
-}
-
-static void k1x_rproc_mb_callback(struct mbox_client *cl, void *data)
-{
+	int ret;
+	struct mbox_client *cl = arg;
 	struct rproc *rproc = dev_get_drvdata(cl->dev);
 	struct spacemit_mbox *mb = container_of(cl, struct spacemit_mbox, client);
-	struct spacemit_rproc *priv = rproc->priv;
+	struct sched_param param = {.sched_priority = 0 };
 
-	queue_work(priv->workqueue, &mb->vq_work);
+	mb->kthread_running = true;
+	ret = sched_setscheduler(current, SCHED_FIFO, &param);
+
+	do {
+		wait_for_completion_timeout(&mb->mb_comp, 10);
+		if (rproc_vq_interrupt(rproc, mb->vq_id) == IRQ_NONE)
+			dev_dbg(&rproc->dev, "no message found in vq%d\n", mb->vq_id);
+	} while (!kthread_should_stop());
+
+	mb->kthread_running = false;
+
+	return 0;
+}
+static void k1x_rproc_mb_callback(struct mbox_client *cl, void *data)
+{
+	struct spacemit_mbox *mb = container_of(cl, struct spacemit_mbox, client);
+
+	complete(&mb->mb_comp);
 }
 
 static struct spacemit_mbox k1x_rpoc_mbox[] = {
@@ -270,6 +319,94 @@ static struct spacemit_mbox k1x_rpoc_mbox[] = {
 		},
 	},
 };
+
+#ifdef CONFIG_PM_SLEEP
+
+#define STARTUP_MSG "pwr_management"
+
+static struct rpmsg_device_id rpmsg_rcpu_pwr_management_id_table[] = {
+	{ .name	= "rcpu-pwr-management-service", .driver_data = 0 },
+	{ },
+};
+MODULE_DEVICE_TABLE(rpmsg, rpmsg_rcpu_pwr_management_id_table);
+
+static int rpmsg_rcpu_pwr_cb(struct rpmsg_device *rpdev, void *data,
+		int len, void *priv, u32 src)
+{
+	struct spacemit_rproc *srproc;
+
+	if (strcmp(data, "pwr_management_ok") == 0) {
+		pr_err("Connection create success\n");
+		return 0;
+	}
+
+	srproc = dev_get_drvdata(&rpdev->dev);
+
+	/* do something */
+
+	return 0;
+}
+
+static int rpmsg_rcpu_pwr_manage_probe(struct rpmsg_device *rpdev)
+{
+	int ret;
+	struct rproc *rproc;
+	struct spacemit_rproc *srproc;
+	struct platform_device *pdev;
+
+	pdev = (struct platform_device *)rpmsg_rcpu_pwr_management_id_table[0].driver_data;
+
+	rproc = platform_get_drvdata(pdev);
+	srproc = rproc->priv;
+	srproc->rpdev = rpdev;
+
+	dev_set_drvdata(&rpdev->dev, srproc);
+
+	dev_info(&rpdev->dev, "new channel: 0x%x -> 0x%x!\n",
+					rpdev->src, rpdev->dst);
+
+	ret = rpmsg_send(rpdev->ept, STARTUP_MSG, strlen(STARTUP_MSG));
+
+	return 0;
+}
+
+static void rpmsg_rcpu_pwr_manage_romove(struct rpmsg_device *rpdev)
+{
+	dev_info(&rpdev->dev, "rpmsg rcpu power management driver is removed\n");
+}
+
+/* here we should register a endpoint for power-management */
+static struct rpmsg_driver rpmsg_rcpu_pm_client = {
+	.drv.name	= KBUILD_MODNAME,
+	.id_table	= rpmsg_rcpu_pwr_management_id_table,
+	.probe		= rpmsg_rcpu_pwr_manage_probe,
+	.callback	= rpmsg_rcpu_pwr_cb,
+	.remove		= rpmsg_rcpu_pwr_manage_romove,
+};
+
+module_rpmsg_driver(rpmsg_rcpu_pm_client);
+
+static int rproc_syscore_suspend(void)
+{
+	return 0;
+}
+
+static void rproc_syscore_resume(void)
+{
+	/* reset the rcpu */
+	reset_control_assert(gcore_reset);
+	reset_control_deassert(gcore_reset);
+	/**
+	 * only open the power-swith
+	* */
+	dev_pm_qos_update_request(&greq, DEV_PM_QOS_PM_DOMAIN_GATE);
+}
+
+static struct syscore_ops rproc_syscore_ops = {
+	.suspend = rproc_syscore_suspend,
+	.resume = rproc_syscore_resume,
+};
+#endif
 
 static int spacemit_rproc_probe(struct platform_device *pdev)
 {
@@ -315,6 +452,8 @@ static int spacemit_rproc_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	gcore_reset = priv->core_rst;
+
 	priv->core_clk = devm_clk_get(dev, "core");
 	if (IS_ERR(priv->core_clk)) {
 		ret = PTR_ERR(priv->core_clk);
@@ -328,12 +467,6 @@ static int spacemit_rproc_probe(struct platform_device *pdev)
 	pm_runtime_enable(dev);
 
 	platform_set_drvdata(pdev, rproc);
-
-	priv->workqueue = create_workqueue(dev_name(dev));
-	if (!priv->workqueue) {
-		dev_err(dev, "cannot create workqueue\n");
-		return -EINVAL;
-	}
 
 	/* get the mailbox */
 	priv->mb = k1x_rpoc_mbox;
@@ -350,9 +483,19 @@ static int spacemit_rproc_probe(struct platform_device *pdev)
 		}
 
 		if (priv->mb[i].vq_id >= 0) {
-			INIT_WORK(&priv->mb[i].vq_work, k1x_rproc_mb_vq_work);
+			priv->mb[i].mb_thread = kthread_run(__process_theread, (void *)cl, name);
+			if (IS_ERR(priv->mb[i].mb_thread))
+				return PTR_ERR(priv->mb[i].mb_thread);
+
+			init_completion(&priv->mb[i].mb_comp);
 		}
 	}
+
+#ifdef CONFIG_PM_SLEEP
+	rpmsg_rcpu_pwr_management_id_table[0].driver_data = (unsigned long long)pdev;
+
+	register_syscore_ops(&rproc_syscore_ops);
+#endif
 
 	rproc->auto_boot = true;
 	ret = devm_rproc_add(dev, rproc);
@@ -377,14 +520,21 @@ static void k1x_rproc_free_mbox(struct rproc *rproc)
 
 static int spacemit_rproc_remove(struct platform_device *pdev)
 {
+	int i = 0;
 	struct rproc *rproc = platform_get_drvdata(pdev);
 	struct spacemit_rproc *ddata = rproc->priv;
 
+	for (i = 0; i < MAX_MBOX; ++i)
+		if (ddata->mb[i].kthread_running)
+			kthread_stop(ddata->mb[i].mb_thread);
+
 	rproc_del(rproc);
 	k1x_rproc_free_mbox(rproc);
-	destroy_workqueue(ddata->workqueue);
 	rproc_free(rproc);
 
+#ifdef CONFIG_PM_SLEEP
+	unregister_rpmsg_driver(&rpmsg_rcpu_pm_client);
+#endif
 	return 0;
 }
 
@@ -395,11 +545,110 @@ static const struct of_device_id spacemit_rproc_of_match[] = {
 
 MODULE_DEVICE_TABLE(of, spacemit_rproc_of_match);
 
+#ifdef CONFIG_PM_SLEEP
+
+#define RCPU_ENTER_LOW_PWR_MODE		"$"
+
+static int spacemit_rproc_suspend(struct device *dev)
+{
+	int ret;
+	unsigned int val;
+	struct rproc *rproc;
+	struct spacemit_rproc *srproc;
+	struct rproc_mem_entry *rcpu_snapshots_mem;
+
+	rproc = dev_get_drvdata(dev);
+	srproc = rproc->priv;
+
+	/* send msg to rcpu to let it enter low power mode */
+	ret = rpmsg_send(srproc->rpdev->ept, RCPU_ENTER_LOW_PWR_MODE,
+			strlen(RCPU_ENTER_LOW_PWR_MODE));
+
+	rcpu_snapshots_mem = rproc_find_carveout_by_name(rproc, "rcpu_mem_snapshots");
+	if (!rcpu_snapshots_mem) {
+		pr_err("Failed to find the rcpu_mem_snapshots\n");
+		return -1;
+	}
+
+	while (1) {
+		/* will be wrotten by rpcu */
+		val = readl(rcpu_snapshots_mem->va);
+		if (val == 1)
+			break;
+	}
+
+	return 0;
+}
+
+static int spacemit_rproc_resume(struct device *dev)
+{
+	int ret;
+	unsigned int val;
+	struct rproc *rproc;
+	struct spacemit_rproc *srproc;
+	struct rproc_mem_entry *rcpu_sram_mem, *rcpu_snapshots_mem;
+
+	rproc = dev_get_drvdata(dev);
+	srproc = rproc->priv;
+
+	/*
+	 * when suspend, do not close the clk & power-switch, it will be
+	 * done by rcpu itself.
+	 * */
+	dev_pm_qos_update_request(&greq, 0);
+
+	/* enable ipc2ap clk & reset--> rcpu side */
+	writel(0xff, srproc->base[BOOTC_MEM_BASE_OFFSET] + ESOS_AON_PER_CLK_RST_CTL_REG);
+
+	/* set ddr map */
+	writel(srproc->ddr_remap_base, srproc->base[SYSCTRL_MEM_BASE_OFFSET] + ESOS_DDR_REGMAP_BASE_REG_OFFSET);
+
+	rcpu_sram_mem = rproc_find_carveout_by_name(rproc, "mem");
+	if (!rcpu_sram_mem) {
+		pr_err("Failed to find the rcpu_mem_0\n");
+		return -1;
+	}
+
+	rcpu_snapshots_mem = rproc_find_carveout_by_name(rproc, "rcpu_mem_snapshots");
+	if (!rcpu_snapshots_mem) {
+		pr_err("Failed to find the rcpu_mem_snapshots\n");
+		return -1;
+	}
+
+	/* copy the code */
+	memcpy((void *)rcpu_sram_mem->va,
+			(void *)((u32 *)rcpu_snapshots_mem->va + 1),
+			rcpu_sram_mem->len - sizeof(u32));
+
+	/* luaching up rpcu */	
+	writel(1, srproc->base[BOOTC_MEM_BASE_OFFSET] + ESOS_BOOTUP_REG_OFFSET);
+	
+	while (1) {
+		/* will be wrotten by rpcu */
+		val = readl(rcpu_snapshots_mem->va);
+		if (val == 2)
+			break;
+	}
+
+	memset((void *)rcpu_snapshots_mem->va, 0, rcpu_snapshots_mem->len);
+
+	return 0;
+}
+
+static const struct dev_pm_ops spacemit_rproc_pm_ops = {
+	.suspend = spacemit_rproc_suspend,
+	.resume = spacemit_rproc_resume,
+};
+#endif
+
 static struct platform_driver spacemit_rproc_driver = {
 	.probe = spacemit_rproc_probe,
 	.remove = spacemit_rproc_remove,
 	.driver = {
 		.name = "spacemit-rproc",
+#ifdef CONFIG_PM_SLEEP
+		.pm	= &spacemit_rproc_pm_ops,
+#endif
 		.of_match_table = spacemit_rproc_of_match,
 	},
 };
@@ -408,4 +657,3 @@ module_platform_driver(spacemit_rproc_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("sapcemit remote processor control driver");
-

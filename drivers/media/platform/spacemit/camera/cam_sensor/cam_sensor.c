@@ -49,8 +49,8 @@ static struct cam_sensor_device *g_sdev[CAM_SNS_MAX_DEV_NUM];
 static int camsnr_major;
 //static struct cdev camsnr_cdev;
 static struct class *camsnr_class;
-struct gpio_desc *dove_evb_dvdden = NULL;
-struct gpio_desc *dove_evb_dcdcen = NULL;
+struct gpio_desc *gpio_dvdden = NULL;
+struct gpio_desc *gpio_dcdcen = NULL;
 
 #define SENSOR_DRIVER_CHECK_POINTER(ptr)			\
 	do {							\
@@ -103,8 +103,8 @@ static int cam_sensor_power_set(struct cam_sensor_device *msnr_dev, u32 on)
 				goto dvdd_err;
 		}
 		/* dvdden-gpios */
-		if (!IS_ERR_OR_NULL(dove_evb_dvdden))	// msnr_dev->dvdden
-			gpiod_direction_output(dove_evb_dvdden, 1);	// msnr_dev->dvdden
+		if (!IS_ERR_OR_NULL(gpio_dvdden))	// msnr_dev->dvdden
+			gpiod_direction_output(gpio_dvdden, 1);	// msnr_dev->dvdden
 		if (!IS_ERR_OR_NULL(msnr_dev->afvdd)) {
 			regulator_set_voltage(msnr_dev->afvdd, 2800000, 2800000);
 			ret = regulator_enable(msnr_dev->afvdd);
@@ -122,7 +122,6 @@ static int cam_sensor_power_set(struct cam_sensor_device *msnr_dev, u32 on)
 			usleep_range(5 * 1000, 5 * 1000);
 			gpiod_set_value_cansleep(msnr_dev->rst, 1);
 			usleep_range(10 * 1000, 10 * 1000);
-			//cam_info("rst-gpios to high --------- ZRong");
 		}
 		cam_dbg("sensor%d unreset", msnr_dev->id);
 	} else {
@@ -141,8 +140,8 @@ static int cam_sensor_power_set(struct cam_sensor_device *msnr_dev, u32 on)
 		if (!IS_ERR_OR_NULL(msnr_dev->dovdd))
 			regulator_disable(msnr_dev->dovdd);
 		/* dvdden-gpios */
-		if (!IS_ERR_OR_NULL(dove_evb_dvdden))	// msnr_dev->dvdden
-			gpiod_direction_output(dove_evb_dvdden, 0);	//msnr_dev->dvdden
+		if (!IS_ERR_OR_NULL(gpio_dvdden))	// msnr_dev->dvdden
+			gpiod_direction_output(gpio_dvdden, 0);	//msnr_dev->dvdden
 		if (!IS_ERR_OR_NULL(msnr_dev->afvdd))
 			regulator_disable(msnr_dev->afvdd);
 
@@ -359,8 +358,8 @@ static int camsnr_set_gpio_enable(unsigned long arg, struct cam_sensor_device *m
 			gpiod_direction_output(msnr_dev->rst, enable);
 		break;
 	case SENSOR_GPIO_DVDDEN:
-		if (!IS_ERR_OR_NULL(dove_evb_dvdden))
-			gpiod_direction_output(dove_evb_dvdden, enable);
+		if (!IS_ERR_OR_NULL(gpio_dvdden))
+			gpiod_direction_output(gpio_dvdden, enable);
 		break;
 	case SENSOR_GPIO_DCDCEN:
 		if (!IS_ERR_OR_NULL(msnr_dev->dcdcen))
@@ -413,7 +412,6 @@ static int camsnr_set_mclk_enable(unsigned long arg, struct cam_sensor_device *m
 
 	if (msnr_dev->mclk) {
 		if (clk_enable && !__clk_is_enabled(msnr_dev->mclk)) {
-			cam_err("%s: mclk enabled ------------- ZRong", __func__);
 			ret = clk_prepare_enable(msnr_dev->mclk);
 			if (ret < 0)
 				return ret;
@@ -639,14 +637,7 @@ static int cam_sensor_read(struct cam_i2c_data *data,
 	return 0;
 
 err:
-	cam_info("%s: Failed reading register 0x%02x!", __func__, reg);
-#if 1
-	for (int i=0; i<1000; i++) {
-		msleep(1000);
-		if (i % 60 == 0)
-			cam_info("sleep %ds", i);
-	}
-#endif
+	cam_err("%s: Failed reading register 0x%02x!", __func__, reg);
 	return ret;
 }
 

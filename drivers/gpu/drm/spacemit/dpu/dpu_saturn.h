@@ -22,18 +22,6 @@
 #define clip(x, a, b) (max(a, min(x, b)))
 #endif
 
-#define DOVE_SCALER_MAX			4
-#define DOVE_DMA_CHANNEL_MAX		4
-#define DOVE_DMA_LAYER_MAX		16
-#define DOVE_COMPOSER_MAX		2
-#define DOVE_COMPOSER_LAYER_MAX	16
-#define DOVE_PANEL_MAX			1
-#define DOVE_OUTCTRL_MAX			4
-#define DOVE_WRITEBACK_MAX		1
-#define DOVE_DISPLAY_MAX			2
-#define DOVE_LUT3D_MAX			0
-#define DOVE_CMDLIST_MAX			5
-
 /* Supported variants of the hardware */
 enum {
 	SATURN_HDMI = 0,
