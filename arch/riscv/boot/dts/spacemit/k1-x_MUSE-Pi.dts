@@ -11,7 +11,7 @@
 #include "k1-x-camera-sdk.dtsi"
 
 / {
-	model = "spacemit k1-x deb1 board";
+	model = "spacemit k1-x MUSE-Pi board";
 	modules_usrload = "8852bs";
 
 	cpus: cpus {
@@ -168,6 +168,12 @@
 			default-state = "on";
 			status = "okay";
 		};
+	};
+
+	usb2hub: usb2hub {
+		compatible = "spacemit,usb3-hub";
+		vbus-gpios = <&gpio 123 0>;	/* for usb2 hub output vbus */
+		status = "okay";
 	};
 };
 
@@ -492,13 +498,15 @@
 	pinctrl-single,gpio-range = <
 		&range GPIO_49  2 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_3V_DS4)
 		&range GPIO_58  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
-		&range GPIO_63  2 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
+		&range GPIO_63  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
+		&range GPIO_64  1 (MUX_MODE1 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_65  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_66  2 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_3V_DS4)
 		&range PRI_TDI  2 (MUX_MODE1 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range PRI_TCK  1 (MUX_MODE1 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 		&range PRI_TDO  1 (MUX_MODE1 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_74  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
+		&range GPIO_79  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_80  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_3V_DS4)
 		&range GPIO_81  3 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_90  1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
@@ -571,9 +579,11 @@
 	gpio-ranges = <
 		&pinctrl 49  GPIO_49  2
 		&pinctrl 58  GPIO_58  1
-		&pinctrl 63  GPIO_63  5
+		&pinctrl 63  GPIO_63  1
+		&pinctrl 65  GPIO_65  3
 		&pinctrl 70  PRI_TDI  4
 		&pinctrl 74  GPIO_74  1
+		&pinctrl 79  GPIO_79  1
 		&pinctrl 80  GPIO_80  4
 		&pinctrl 90  GPIO_90  3
 		&pinctrl 96  DVL0     2
@@ -781,10 +791,7 @@
 };
 
 &usb3hub {
-	hub-gpios = <
-		&gpio 123 0	/* usb3 hub en */
-		&gpio 124 0>;	/* usb3 hub rst*/
-	vbus-gpios = <&gpio 97 0>;	/* gpio_97 for usb3 hub output vbus */
+	vbus-gpios = <&gpio 79 0>;	/* gpio_79 for usb3 hub output vbus */
 	status = "okay";
 };
 
@@ -878,23 +885,18 @@
 	avdd_2v8-supply = <&ldo_2>;
 	dovdd_1v8-supply = <&ldo_7>;
 
+	pwdn-gpios = <&gpio 124 GPIO_ACTIVE_HIGH>;
+	reset-gpios = <&gpio 97 GPIO_ACTIVE_HIGH>;
 	status = "disabled";
 };
 
 &frontsensor {
-	af_2v8-supply = <&ldo_3>;
 	avdd_2v8-supply = <&ldo_2>;
 	dovdd_1v8-supply = <&ldo_7>;
 	dvdd_1v2-supply = <&ldo_6>;
 
-	clocks = <&ccu CLK_CAMM1>;
-	clock-names = "cam_mclk1";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_camera1>;
-
-	pwdn-gpios = <&gpio 114 0>;
-	reset-gpios = <&gpio 112 0>;
-
+	pwdn-gpios = <&gpio 124 GPIO_ACTIVE_HIGH>;
+	reset-gpios = <&gpio 97 GPIO_ACTIVE_HIGH>;
 	status = "disabled";
 };
 &csiphy0 {
