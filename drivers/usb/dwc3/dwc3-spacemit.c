@@ -11,6 +11,8 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/platform_device.h>
+#include <linux/usb/phy.h>
+#include <linux/phy/phy.h>
 #include <linux/clk.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
@@ -23,6 +25,7 @@ struct dwc3_spacemit_driverdata {
 	const char		*clk_names[DWC3_SPACEMIT_MAX_CLOCKS];
 	int			num_clks;
 	int			suspend_clk_idx;
+	bool		need_notify_disconnect;
 };
 
 struct dwc3_spacemit {
@@ -33,19 +36,108 @@ struct dwc3_spacemit {
 	struct clk		*clks[DWC3_SPACEMIT_MAX_CLOCKS];
 	int			num_clks;
 	int			suspend_clk_idx;
+	bool		reset_on_resume;
+
+	struct usb_phy		*usb2_phy;
+	struct usb_phy		*usb3_phy;
+	struct phy		*usb2_generic_phy;
+	struct phy		*usb3_generic_phy;
+
+	bool 		need_notify_disconnect;
 };
+
+void dwc3_spacemit_clear_disconnect(struct device *dev)
+{
+	struct platform_device *pdev;
+	struct dwc3_spacemit *spacemit;
+	dev_dbg(dev, "%s: clear disconnect\n", __func__);
+	if (!dev)
+		return;
+	pdev = to_platform_device(dev);
+	if (IS_ERR_OR_NULL(pdev))
+		return;
+	spacemit = platform_get_drvdata(pdev);
+	if(!spacemit->need_notify_disconnect)
+		return;
+	usb_phy_notify_disconnect(spacemit->usb2_phy, USB_SPEED_HIGH);
+}
+
+static int dwc3_spacemit_get_phy(struct dwc3_spacemit *spacemit)
+{
+	struct device		*dev = spacemit->dev;
+	int ret;
+
+	spacemit->usb2_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 0);
+	spacemit->usb3_phy = devm_usb_get_phy_by_phandle(dev, "usb-phy", 1);
+	if (IS_ERR(spacemit->usb2_phy)) {
+		ret = PTR_ERR(spacemit->usb2_phy);
+		if (ret == -ENXIO || ret == -ENODEV)
+			spacemit->usb2_phy = NULL;
+		else
+			return dev_err_probe(dev, ret, "no usb2 phy configured\n");
+	}
+
+	if (IS_ERR(spacemit->usb3_phy)) {
+		ret = PTR_ERR(spacemit->usb3_phy);
+		if (ret == -ENXIO || ret == -ENODEV)
+			spacemit->usb3_phy = NULL;
+		else
+			return dev_err_probe(dev, ret, "no usb3 phy configured\n");
+	}
+
+	spacemit->usb2_generic_phy = devm_phy_get(dev, "usb2-phy");
+	if (IS_ERR(spacemit->usb2_generic_phy)) {
+		ret = PTR_ERR(spacemit->usb2_generic_phy);
+		if (ret == -ENOSYS || ret == -ENODEV)
+			spacemit->usb2_generic_phy = NULL;
+		else
+			return dev_err_probe(dev, ret, "no usb2 phy configured\n");
+	}
+
+	spacemit->usb3_generic_phy = devm_phy_get(dev, "usb3-phy");
+	if (IS_ERR(spacemit->usb3_generic_phy)) {
+		ret = PTR_ERR(spacemit->usb3_generic_phy);
+		if (ret == -ENOSYS || ret == -ENODEV)
+			spacemit->usb3_generic_phy = NULL;
+		else
+			return dev_err_probe(dev, ret, "no usb3 phy configured\n");
+	}
+
+	return 0;
+}
+
+static int dwc3_spacemit_phy_setup(struct dwc3_spacemit *spacemit, bool enable)
+{
+	if (enable) {
+		usb_phy_init(spacemit->usb2_phy);
+		usb_phy_init(spacemit->usb3_phy);
+		phy_init(spacemit->usb2_generic_phy);
+		phy_init(spacemit->usb3_generic_phy);
+	} else {
+		usb_phy_shutdown(spacemit->usb2_phy);
+		usb_phy_shutdown(spacemit->usb3_phy);
+		phy_exit(spacemit->usb2_generic_phy);
+		phy_exit(spacemit->usb3_generic_phy);
+	}
+	return 0;
+}
 
 static int dwc3_spacemit_init(struct dwc3_spacemit *data)
 {
 	struct device *dev = data->dev;
-	int	ret = 0;
+	int	ret = 0, i;
 
-	data->resets = devm_reset_control_array_get_optional_exclusive(dev);
-	if (IS_ERR(data->resets)) {
-		ret = PTR_ERR(data->resets);
-		dev_err(dev, "failed to get resets, err=%d\n", ret);
-		return ret;
+	for (i = 0; i < data->num_clks; i++) {
+		ret = clk_prepare_enable(data->clks[i]);
+		if (ret) {
+			while (i-- > 0)
+				clk_disable_unprepare(data->clks[i]);
+			return ret;
+		}
 	}
+
+	if (data->suspend_clk_idx >= 0)
+		clk_prepare_enable(data->clks[data->suspend_clk_idx]);
 
 	ret = reset_control_assert(data->resets);
 	if (ret) {
@@ -58,6 +150,30 @@ static int dwc3_spacemit_init(struct dwc3_spacemit *data)
 		dev_err(dev, "failed to deassert resets, err=%d\n", ret);
 		return ret;
 	}
+
+	dwc3_spacemit_phy_setup(data, true);
+
+	return 0;
+}
+
+static int dwc3_spacemit_exit(struct dwc3_spacemit *data)
+{
+	struct device *dev = data->dev;
+	int	ret = 0, i;
+
+	dwc3_spacemit_phy_setup(data, false);
+
+	ret = reset_control_assert(data->resets);
+	if (ret) {
+		dev_err(dev, "failed to assert resets, err=%d\n", ret);
+		return ret;
+	}
+
+	if (data->suspend_clk_idx >= 0)
+		clk_disable_unprepare(data->clks[data->suspend_clk_idx]);
+
+	for (i = data->num_clks - 1; i >= 0; i--)
+		clk_disable_unprepare(data->clks[i]);
 
 	return 0;
 }
@@ -79,6 +195,8 @@ static int dwc3_spacemit_probe(struct platform_device *pdev)
 	spacemit->num_clks = driver_data->num_clks;
 	spacemit->clk_names = (const char **)driver_data->clk_names;
 	spacemit->suspend_clk_idx = driver_data->suspend_clk_idx;
+	spacemit->need_notify_disconnect = driver_data->need_notify_disconnect;
+	spacemit->reset_on_resume = device_property_read_bool(&pdev->dev, "reset-on-resume");
 
 	platform_set_drvdata(pdev, spacemit);
 
@@ -91,22 +209,21 @@ static int dwc3_spacemit_probe(struct platform_device *pdev)
 		}
 	}
 
-	for (i = 0; i < spacemit->num_clks; i++) {
-		ret = clk_prepare_enable(spacemit->clks[i]);
-		if (ret) {
-			while (i-- > 0)
-				clk_disable_unprepare(spacemit->clks[i]);
-			return ret;
-		}
+	spacemit->resets = devm_reset_control_array_get_optional_exclusive(dev);
+	if (IS_ERR(spacemit->resets)) {
+		ret = PTR_ERR(spacemit->resets);
+		dev_err(dev, "failed to get resets, err=%d\n", ret);
+		return ret;
 	}
 
-	if (spacemit->suspend_clk_idx >= 0)
-		clk_prepare_enable(spacemit->clks[spacemit->suspend_clk_idx]);
+	ret = dwc3_spacemit_get_phy(spacemit);
+	if (ret)
+		return ret;
 
 	ret = dwc3_spacemit_init(spacemit);
 	if (ret) {
 		dev_err(dev, "failed to init spacemit\n");
-		goto populate_err;
+		return ret;
 	}
 
 	if (node) {
@@ -124,27 +241,16 @@ static int dwc3_spacemit_probe(struct platform_device *pdev)
 	return 0;
 
 populate_err:
-	for (i = spacemit->num_clks - 1; i >= 0; i--)
-		clk_disable_unprepare(spacemit->clks[i]);
-
-	if (spacemit->suspend_clk_idx >= 0)
-		clk_disable_unprepare(spacemit->clks[spacemit->suspend_clk_idx]);
-
+	dwc3_spacemit_exit(spacemit);
 	return ret;
 }
 
 static int dwc3_spacemit_remove(struct platform_device *pdev)
 {
 	struct dwc3_spacemit	*spacemit = platform_get_drvdata(pdev);
-	int i;
 
 	of_platform_depopulate(&pdev->dev);
-
-	for (i = spacemit->num_clks - 1; i >= 0; i--)
-		clk_disable_unprepare(spacemit->clks[i]);
-
-	if (spacemit->suspend_clk_idx >= 0)
-		clk_disable_unprepare(spacemit->clks[spacemit->suspend_clk_idx]);
+	dwc3_spacemit_exit(spacemit);
 
 	return 0;
 }
@@ -153,12 +259,14 @@ static const struct dwc3_spacemit_driverdata spacemit_k1pro_drvdata = {
 	.clk_names = { "usbdrd30" },
 	.num_clks = 0,
 	.suspend_clk_idx = -1,
+	.need_notify_disconnect = false,
 };
 
 static const struct dwc3_spacemit_driverdata spacemit_k1x_drvdata = {
 	.clk_names = { "usbdrd30" },
 	.num_clks = 1,
 	.suspend_clk_idx = -1,
+	.need_notify_disconnect = true,
 };
 
 static const struct of_device_id spacemit_dwc3_match[] = {
@@ -178,8 +286,15 @@ MODULE_DEVICE_TABLE(of, spacemit_dwc3_match);
 static int dwc3_spacemit_suspend(struct device *dev)
 {
 	struct dwc3_spacemit *spacemit = dev_get_drvdata(dev);
-	int i;
+	int i, ret;
 
+	dwc3_spacemit_phy_setup(spacemit, false);
+	if (spacemit->reset_on_resume){
+		ret = reset_control_assert(spacemit->resets);
+		if (ret)
+			return ret;
+		dev_info(spacemit->dev, "Will reset controller and phy on resume\n");
+	}
 	for (i = spacemit->num_clks - 1; i >= 0; i--)
 		clk_disable_unprepare(spacemit->clks[i]);
 
@@ -199,6 +314,13 @@ static int dwc3_spacemit_resume(struct device *dev)
 			return ret;
 		}
 	}
+	if (spacemit->reset_on_resume){
+		dev_info(spacemit->dev, "Resetting controller and phy\n");
+		ret = reset_control_deassert(spacemit->resets);
+		if (ret)
+			return ret;
+	}
+	dwc3_spacemit_phy_setup(spacemit, true);
 
 	return 0;
 }

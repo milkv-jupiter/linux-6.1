@@ -143,7 +143,6 @@
 		io-supply = <&dcdc_3>;
 		io_voltage = <1800000>;
 		pwr-gpios  = <&gpio 67 0>;
-		power-always-on;
 		status = "okay";
 
 		wlan_pwrseq: wlan-pwrseq {
@@ -192,6 +191,7 @@
 &dpu_online2_dsi {
 	memory-region = <&dpu_resv>;
 	spacemit-dpu-bitclk = <1000000000>;
+	spacemit-dpu-escclk = <76800000>;
 	dsi_1v2-supply = <&ldo_5>;
 	vin-supply-names = "dsi_1v2";
 	status = "disabled";
@@ -231,18 +231,21 @@
 &i2c0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c0>;
+	spacemit,i2c-fast-mode;
 	status = "okay";
 };
 
 &i2c1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c1>;
+	spacemit,i2c-fast-mode;
 	status = "okay";
 };
 
 &i2c2 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c2_0>;
+	spacemit,i2c-fast-mode;
 	status = "okay";
 
 	eeprom@50{
@@ -647,8 +650,9 @@
 			SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
 			SDHCI_QUIRK2_BROKEN_PHY_MODULE
 			)>;
-	spacemit,rx_dline_reg = <0x01>;
+	spacemit,rx_dline_reg = <0x0>;
 	spacemit,rx_tuning_limit = <50>;
+	spacemit,rx_tuning_type = <0x0>;
 	spacemit,sdh-freq = <204800000>;
 	status = "okay";
 };
@@ -769,6 +773,7 @@
 };
 
 &ehci1 {
+	spacemit,reset-on-resume;
 	status = "okay";
 };
 
@@ -790,18 +795,17 @@
 
 &usbdrd3 {
 	status = "okay";
+	reset-on-resume;
 	dwc3@c0a00000 {
 		dr_mode = "host";
 		phy_type = "utmi";
 		snps,hsphy_interface = "utmi";
 		snps,dis_enblslpm_quirk;
-		snps,dis-u1u2-quirk;
-		snps,dis-u2-freeclk-exists-quirk;
-		snps,dis-del-phy-power-chg-quirk;
 		snps,dis_u2_susphy_quirk;
 		snps,dis_u3_susphy_quirk;
-		snps,dis_rxdet_inp3_quirk;
-		snps,xhci-trb-ent-quirk;
+		snps,dis-del-phy-power-chg-quirk;
+		snps,dis-tx-ipgap-linecheck-quirk;
+		snps,parkmode-disable-ss-quirk;
 	};
 };
 
@@ -959,8 +963,6 @@
 	pinctrl-0 = <&pinctrl_rcpu>;
 	mboxes = <&mailbox 0>, <&mailbox 1>;
 	mbox-names = "vq0", "vq1";
-	interconnects = <&dram_range0>;
-	interconnect-names = "dma-mem";
 	memory-region = <&rcpu_mem_0>, <&vdev0vring0>, <&vdev0vring1>, <&vdev0buffer>, <&rsc_table>, <&rcpu_mem_snapshots>;
 	status = "okay";
 };
@@ -988,4 +990,10 @@
 	simple-audio-card,codec {
 		sound-dai = <&es8326>;
 	};
+};
+
+&rpwm2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_rpwm2_0>;
+	status = "okay";
 };

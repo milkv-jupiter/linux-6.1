@@ -583,8 +583,9 @@
 				<0x0 0xd8440000 0x0 0x98>,
 				<0x0 0xc0000000 0x0 0x4280>,
 				<0x0 0xf0610000 0x0 0x20>,
-				<0x0 0xc0880000 0x0 0x2050>;
-			reg-names = "mpmu", "apmu", "apbc", "apbs", "ciu", "dciu", "ddrc", "apbc2", "rcpu";
+				<0x0 0xc0880000 0x0 0x2050>,
+				<0x0 0xc0888000 0x0 0x30>;
+			reg-names = "mpmu", "apmu", "apbc", "apbs", "ciu", "dciu", "ddrc", "apbc2", "rcpu", "rcpu2";
 			clocks = <&vctcxo_24>, <&vctcxo_3>, <&vctcxo_1>, <&pll1_2457p6_vco>,
 				<&clk_32k>;
 			clock-names = "vctcxo_24", "vctcxo_3", "vctcxo_1", "pll1_2457p6_vco",
@@ -603,8 +604,9 @@
 				<0x0 0xd8440000 0x0 0x98>,
 				<0x0 0xc0000000 0x0 0x4280>,
 				<0x0 0xf0610000 0x0 0x20>,
-				<0x0 0xc0880000 0x0 0x2050>;
-			reg-names = "mpmu", "apmu", "apbc", "apbs", "ciu", "dciu", "ddrc", "apbc2", "rcpu";
+				<0x0 0xc0880000 0x0 0x2050>,
+				<0x0 0xc0888000 0x0 0x30>;
+			reg-names = "mpmu", "apmu", "apbc", "apbs", "ciu", "dciu", "ddrc", "apbc2", "rcpu", "rcpu2";
 			#reset-cells = <1>;
 			status = "okay";
 		};
@@ -817,7 +819,7 @@
 		};
 
 		uart3: uart@d4017200 {
-			compatible = "spcaemit,pxa-uart";
+			compatible = "spacemit,pxa-uart";
 			reg = <0x0 0xd4017200 0x0 0x100>;
 			interrupt-parent = <&intc>;
 			interrupts = <45>;
@@ -1093,7 +1095,7 @@
 			dma-names = "rx", "tx";
 			*/
 			spacemit,dma-disable;
-			spacemit,i2c-fast-mode;
+			/* spacemit,i2c-fast-mode; */
 			/* spacemit,i2c-high-mode; */
 			spacemit,i2c-master-code = /bits/ 8 <0x0e>;
 			spacemit,i2c-clk-rate = <32000000>;
@@ -1125,7 +1127,7 @@
                         dma-names = "rx", "tx";
                         */
                         spacemit,dma-disable;
-                        spacemit,i2c-fast-mode;
+                        /* spacemit,i2c-fast-mode; */
                         /* spacemit,i2c-high-mode; */
                         spacemit,i2c-master-code = /bits/ 8 <0x0e>;
                         spacemit,i2c-clk-rate = <32000000>;
@@ -1157,7 +1159,7 @@
                         dma-names = "rx", "tx";
                         */
                         spacemit,dma-disable;
-                        spacemit,i2c-fast-mode;
+                        /* spacemit,i2c-fast-mode; */
                         /* spacemit,i2c-high-mode; */
                         spacemit,i2c-master-code = /bits/ 8 <0x0e>;
                         spacemit,i2c-clk-rate = <32000000>;
@@ -1182,7 +1184,7 @@
                         interrupt-parent = <&intc>;
                         interrupts = <39>;
                         spacemit,dma-disable;
-                        spacemit,i2c-fast-mode;
+                        /* spacemit,i2c-fast-mode; */
                         /* spacemit,i2c-high-mode; */
                         spacemit,i2c-master-code = /bits/ 8 <0x0e>;
                         spacemit,i2c-clk-rate = <32000000>;
@@ -1214,7 +1216,7 @@
 			dma-names = "rx", "tx";
 			*/
 			spacemit,dma-disable;
-			spacemit,i2c-fast-mode;
+			/* spacemit,i2c-fast-mode; */
 			/* spacemit,i2c-high-mode; */
 			spacemit,i2c-master-code = /bits/ 8 <0x0e>;
 			spacemit,i2c-clk-rate = <32000000>;
@@ -1246,7 +1248,7 @@
                         dma-names = "rx", "tx";
                         */
                         spacemit,dma-disable;
-                        spacemit,i2c-fast-mode;
+                        /* spacemit,i2c-fast-mode; */
                         /* spacemit,i2c-high-mode; */
                         spacemit,i2c-master-code = /bits/ 8 <0x0e>;
                         spacemit,i2c-clk-rate = <32000000>;
@@ -1557,6 +1559,17 @@
 			status = "disabled";
 		};
 
+		rpwm2: pwm@c0888300 {
+			compatible = "spacemit,k1x-pwm";
+			reg = <0x0 0xc0888300 0x0 0x10>;
+			#pwm-cells = <1>;
+			clocks = <&ccu CLK_RCPU2_PWM>;
+			resets = <&reset RESET_RCPU2_PWM>;
+			k1x,pwm-disable-fd;
+			rcpu-pwm;
+			status = "disabled";
+		};
+
 		timer0: timer@d4014000 {
 			compatible = "spacemit,soc-timer";
 			reg = <0x0 0xd4014000 0x0 0xc8>;
@@ -1638,6 +1651,21 @@
 			fsl,clk-source = <0>;
 			interconnects = <&dram_range0>;
 			interconnect-names = "dma-mem";
+			status = "disabled";
+		};
+
+		flexcan1: fdcan@c0870000 {
+			compatible = "spacemit,k1x-flexcan";
+			reg = <0x0 0xc0870000 0x0 0x4000>;
+			interrupt-parent = <&intc>;
+			clock-frequency = <20000000>;
+			fsl,clk-source = <0>;
+			clocks = <&ccu CLK_RCPU_CAN>,<&ccu CLK_RCPU_CAN_BUS>;
+			clock-names = "per","ipg";
+			resets = <&reset RESET_RCPU_CAN>;
+			interconnects = <&dram_range0>;
+			interconnect-names = "dma-mem";
+			rcpu-can;
 			status = "disabled";
 		};
 
@@ -1844,6 +1872,9 @@
 			reset-names = "ctl_rst";
 			clocks = <&ccu CLK_USB30>;
 			clock-names = "usbdrd30";
+			phys = <&combphy PHY_TYPE_USB3>;
+			phy-names = "usb3-phy";
+			usb-phy = <&usb2phy>;
 			interrupt-parent = <&intc>;
 			interrupts = <149>;
 			ranges;
@@ -1856,9 +1887,6 @@
 				reg = <0x0 0xc0a00000 0x0 0x10000>;
 				interrupt-parent = <&intc>;
 				interrupts = <125>;
-				phys = <&combphy PHY_TYPE_USB3>;
-				phy-names = "usb3-phy";
-				usb-phy = <&usb2phy>;
 			};
 		};
 
@@ -2259,13 +2287,11 @@
 			interrupts = <74>;
 			clocks = <&ccu CLK_VPU>;
 			clock-names = "vpu_clk";
-			assigned-clocks = <&ccu CLK_VPU>;
-			assigned-clock-parents = <&ccu CLK_PLL1_819>;
-			assigned-clock-rates = <819200000>;
 			power-domains = <&power K1X_PMU_VPU_PWR_DOMAIN>;
 			resets = <&reset RESET_VPU>;
 			interconnects = <&dram_range1>;
 			interconnect-names = "dma-mem";
+			clk,pm-runtime,no-sleep;
 			status = "okay";
 		};
 
