@@ -566,8 +566,7 @@
 			)>;
 	spacemit,rx_dline_reg = <0x0>;
 	spacemit,rx_tuning_limit = <50>;
-	spacemit,rx_tuning_type = <0x0>;
-	spacemit,sdh-freq = <204800000>;
+	spacemit,sdh-freq = <375000000>;
 	status = "disabled";
 };
 

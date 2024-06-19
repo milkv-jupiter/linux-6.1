@@ -1955,7 +1955,7 @@
 			compatible = "k1x,dwc-pcie";
 			reg = <0x0 0xca000000 0x0 0x00001000>, /* dbi */
 			      <0x0 0xca300000 0x0 0x0001ff24>, /* atu registers */
-			      <0x0 0x80000000 0x0 0x00002000>, /* config space */
+			      <0x0 0x8f000000 0x0 0x00002000>, /* config space */
 			      <0x0 0xd4282bcc 0x0 0x00000008>, /* k1x soc config addr */
 			      <0x0 0xc0b20000 0x0 0x00001000>, /* phy ahb */
 			      <0x0 0xc0b10000 0x0 0x00001000>, /* phy addr */
@@ -1977,8 +1977,8 @@
 			device_type = "pci";
 			#address-cells = <3>;
 			#size-cells = <2>;
-			ranges = <0x01000000 0x0 0x80002000 0 0x80002000 0x0 0x100000>,
-				<0x02000000 0x0 0x80102000 0 0x80102000 0x0 0x0f000000>;
+			ranges = <0x01000000 0x0 0x8f002000 0 0x8f002000 0x0 0x100000>,
+				 <0x02000000 0x0 0x80000000 0 0x80000000 0x0 0x0f000000>;
 			interconnects = <&dram_range2>;
 			interconnect-names = "dma-mem";
 
@@ -2004,7 +2004,7 @@
 			compatible = "k1x,dwc-pcie";
 			reg = <0x0 0xca400000 0x0 0x00001000>, /* dbi */
 			      <0x0 0xca700000 0x0 0x0001ff24>, /* atu registers */
-			      <0x0 0x90000000 0x0 0x00002000>, /* config space */
+			      <0x0 0x9f000000 0x0 0x00002000>, /* config space */
 			      <0x0 0xd4282bd4 0x0 0x00000008>, /* k1x soc config addr */
 			      <0x0 0xc0c20000 0x0 0x00001000>, /* phy ahb */
 			      <0x0 0xc0c10000 0x0 0x00001000>, /* phy addr */
@@ -2026,8 +2026,8 @@
 			device_type = "pci";
 			#address-cells = <3>;
 			#size-cells = <2>;
-			ranges = <0x01000000 0x0 0x90002000 0 0x90002000 0x0 0x100000>,
-				<0x02000000 0x0 0x90102000 0 0x90102000 0x0 0x0f000000>;
+			ranges = <0x01000000 0x0 0x9f002000 0 0x9f002000 0x0 0x100000>,
+				 <0x02000000 0x0 0x90000000 0 0x90000000 0x0 0x0f000000>;
 			interconnects = <&dram_range2>;
 			interconnect-names = "dma-mem";
 
@@ -2053,7 +2053,7 @@
 			compatible = "k1x,dwc-pcie";
 			reg = <0x0 0xca800000 0x0 0x00001000>, /* dbi */
 			      <0x0 0xcab00000 0x0 0x0001ff24>, /* atu registers */
-			      <0x0 0xa0000000 0x0 0x00002000>, /* config space */
+			      <0x0 0xb7000000 0x0 0x00002000>, /* config space */
 			      <0x0 0xd4282bdc 0x0 0x00000008>, /* k1x soc config addr */
 			      <0x0 0xc0d20000 0x0 0x00001000>, /* phy ahb */
 			      <0x0 0xc0d10000 0x0 0x00001000>, /* phy addr */
@@ -2075,8 +2075,8 @@
 			device_type = "pci";
 			#address-cells = <3>;
 			#size-cells = <2>;
-			ranges = <0x01000000 0x0 0xa0002000 0 0xa0002000 0x0 0x100000>,
-				<0x02000000 0x0 0xa0102000 0 0xa0102000 0x0 0x10000000>;
+			ranges = <0x01000000 0x0 0xb7002000 0 0xb7002000 0x0 0x100000>,
+				 <0x02000000 0x0 0xa0000000 0 0xa0000000 0x0 0x17000000>;
 			interconnects = <&dram_range2>;
 			interconnect-names = "dma-mem";
 
@@ -2152,7 +2152,7 @@
                         status = "okay";
                 };
 
-		thermal-zones {
+		thermal_zones: thermal-zones {
 			cluster0_thermal {
 				polling-delay = <0>;
 				polling-delay-passive = <0>;
@@ -2468,7 +2468,7 @@
 		resets = <&reset RESET_SSPA0>;
 		reset-names = "sspa-rst";
 		assigned-clocks = <&ccu CLK_SSPA0>;
-		assigned-clock-rates = <3072000>;
+		assigned-clock-rates = <1536000>;
 		power-domains = <&power K1X_PMU_DUMMY_PWR_DOMAIN>;
 		status = "disabled";
 	};
@@ -2483,7 +2483,7 @@
 		resets = <&reset RESET_SSPA1>;
 		reset-names = "sspa-rst";
 		assigned-clocks = <&ccu CLK_SSPA1>;
-		assigned-clock-rates = <3072000>;
+		assigned-clock-rates = <1536000>;
 		power-domains = <&power K1X_PMU_DUMMY_PWR_DOMAIN>;
 		status = "disabled";
 	};
@@ -2521,9 +2521,8 @@
 		};
 	};
 
-	sound_es8326: snd-card@1 {
+	sound_codec: snd-card@1 {
 		compatible = "spacemit,simple-audio-card";
-		simple-audio-card,name = "snd-es8326";
 		simple-audio-card,format = "i2s";
 		status = "disabled";
 		spacemit,init-jack;

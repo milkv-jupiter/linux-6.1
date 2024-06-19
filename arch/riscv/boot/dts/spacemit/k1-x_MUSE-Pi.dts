@@ -353,6 +353,11 @@
 				regulator-max-microvolt = <3450000>;
 				regulator-ramp-delay = <5000>;
 				regulator-always-on;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <650000>;
+				};
 			};
 
 			dcdc_2: DCDC_REG2 {
@@ -377,6 +382,11 @@
 				regulator-max-microvolt = <3300000>;
 				regulator-ramp-delay = <5000>;
 				regulator-always-on;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <3300000>;
+				};
 			};
 
 			dcdc_5: DCDC_REG5 {
@@ -401,24 +411,45 @@
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3400000>;
 				regulator-boot-on;
+
+				/* set the min voltage means will disable this vol in suspend for ldo */
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <500000>;
+				};
 			};
 
 			ldo_2: LDO_REG2 {
 				regulator-name = "ldo2";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3400000>;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <500000>;
+				};
 			};
 
 			ldo_3: LDO_REG3 {
 				regulator-name = "ldo3";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3400000>;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <500000>;
+				};
 			};
 
 			ldo_4: LDO_REG4 {
 				regulator-name = "ldo4";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3400000>;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <500000>;
+				};
 			};
 
 			/* dldo */
@@ -427,18 +458,33 @@
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3400000>;
 				regulator-boot-on;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <500000>;
+				};
 			};
 
 			ldo_6: LDO_REG6 {
 				regulator-name = "ldo6";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3400000>;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <500000>;
+				};
 			};
 
 			ldo_7: LDO_REG7 {
 				regulator-name = "ldo7";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3400000>;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <500000>;
+				};
 			};
 
 			ldo_8: LDO_REG8 {
@@ -661,8 +707,7 @@
 			)>;
 	spacemit,rx_dline_reg = <0x0>;
 	spacemit,rx_tuning_limit = <50>;
-	spacemit,rx_tuning_type = <0x0>;
-	spacemit,sdh-freq = <204800000>;
+	spacemit,sdh-freq = <375000000>;
 	status = "okay";
 };
 
@@ -877,7 +922,7 @@
 	status = "okay";
 };
 
-/* ov16a10 */
+/* MIPI CSI1, clk lane1 */
 &backsensor {
 	af_2v8-supply = <&ldo_3>;
 	avdd_2v8-supply = <&ldo_2>;
@@ -890,22 +935,41 @@
 	status = "okay";
 };
 
+/* MIPI CSI3 data line0,1 clk lane2 */
 &backsensor_aux {
-	avdd_2v8-supply = <&ldo_2>;
-	dovdd_1v8-supply = <&ldo_7>;
-
-	pwdn-gpios = <&gpio 124 GPIO_ACTIVE_HIGH>;
-	reset-gpios = <&gpio 97 GPIO_ACTIVE_HIGH>;
-	status = "disabled";
-};
-
-&frontsensor {
+	af_2v8-supply = <&ldo_3>;
 	avdd_2v8-supply = <&ldo_2>;
 	dovdd_1v8-supply = <&ldo_7>;
 	dvdd_1v2-supply = <&ldo_6>;
 
-	pwdn-gpios = <&gpio 124 GPIO_ACTIVE_HIGH>;
-	reset-gpios = <&gpio 97 GPIO_ACTIVE_HIGH>;
+	pwdn-gpios = <&gpio 124 0>;
+	reset-gpios = <&gpio 97 0>;
+
+	twsi-index = <0>;
+	clocks = <&ccu CLK_CAMM0>;
+	clock-names = "cam_mclk0";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_camera0>;
+
+	status = "disabled";
+};
+
+/* MIPI CSI3 data line2,3 clk lane3 */
+&frontsensor {
+	af_2v8-supply = <&ldo_3>;
+	avdd_2v8-supply = <&ldo_2>;
+	dovdd_1v8-supply = <&ldo_7>;
+	dvdd_1v2-supply = <&ldo_6>;
+
+	pwdn-gpios = <&gpio 124 0>;
+	reset-gpios = <&gpio 97 0>;
+
+	twsi-index = <0>;
+	clocks = <&ccu CLK_CAMM0>;
+	clock-names = "cam_mclk0";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_camera0>;
+
 	status = "disabled";
 };
 &csiphy0 {
@@ -992,8 +1056,10 @@
 	status = "okay";
 };
 
-&sound_es8326 {
+&sound_codec {
 	status = "okay";
+	simple-audio-card,name = "snd-es8326";
+	spacemit,mclk-fs = <64>;
 	simple-audio-card,codec {
 		sound-dai = <&es8326>;
 	};

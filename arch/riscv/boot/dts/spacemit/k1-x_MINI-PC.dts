@@ -5,6 +5,8 @@
 
 #include "k1-x.dtsi"
 #include "k1-x_pinctrl.dtsi"
+#include "lcd/lcd_lt9711_dp_1920x1080.dtsi"
+#include "k1-x-lcd.dtsi"
 #include "k1-x-hdmi.dtsi"
 
 / {
@@ -263,6 +265,46 @@
 	status = "disabled";
 };
 
+&dpu_online2_dsi {
+	memory-region = <&dpu_resv>;
+	spacemit-dpu-bitclk = <1000000000>;
+	spacemit-dpu-escclk = <76800000>;
+	dsi_1v2-supply = <&ldo_5>;
+	vin-supply-names = "dsi_1v2";
+	status = "okay";
+};
+
+&dsi2 {
+	force-attached = "lcd_lt9711_dp_1920x1080";
+	status = "okay";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			dsi1_output: endpoint@1 {
+				reg = <1>;
+				remote-endpoint = <&lt9711_in>;
+			};
+		};
+	};
+
+	dp_panel: panel@0 {
+			status = "okay";
+			compatible = "spacemit,dp-panel";
+	};
+
+};
+
+&lcds {
+	status = "okay";
+};
+
 &dpu_online2_hdmi {
 	memory-region = <&dpu_resv>;
 	status = "okay";
@@ -311,15 +353,16 @@
 		};
 	};
 
-	es8326@19{
-                compatible = "everest,es8326";
-                reg = <0x19>;
-                #sound-dai-cells = <0>;
-                interrupt-parent = <&gpio>;
-                interrupts = <126 1>;
-                spk-ctl-gpio = <&gpio 127 0>;
-                status = "okay";
-        };
+	es8326: es8326@19{
+		compatible = "everest,es8326";
+		reg = <0x19>;
+		#sound-dai-cells = <0>;
+		hp-detect-gpio = <&gpio 58 0>;
+		mic-detect-gpio = <&gpio 114 0>;
+		everest,mic1-src = [00];
+		everest,mic2-src = [00];
+		status = "okay";
+	};
 };
 
 &i2c3 {
@@ -331,7 +374,21 @@
 &i2c4 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c4_2>;
-	status = "disabled";
+	clock-frequency = <100000>;
+	status = "okay";
+
+	lt9711_i2c@41 {
+		compatible = "lontium,lt9711";
+		reg = <0x41>;
+		status = "okay";
+
+		port {
+				lt9711_in: endpoint {
+					remote-endpoint = <&dsi1_output>;
+				};
+		};
+	};
+
 };
 
 &i2c6 {
@@ -339,6 +396,7 @@
 	pinctrl-0 = <&pinctrl_i2c6_2>;
 	status = "disabled";
 };
+
 
 &i2c7 {
 	pinctrl-names = "default";
@@ -370,6 +428,11 @@
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3450000>;
 				regulator-always-on;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <650000>;
+				};
 			};
 
 			dcdc_2: DCDC_REG2 {
@@ -391,6 +454,11 @@
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3300000>;
 				regulator-always-on;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <3300000>;
+				};
 			};
 
 			dcdc_5: DCDC_REG5 {
@@ -412,25 +480,45 @@
 				regulator-name = "ldo1";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3400000>;
-				regulator-boot-on;
+				regulator-always-on;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <500000>;
+				};
 			};
 
 			ldo_2: LDO_REG2 {
 				regulator-name = "ldo2";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3400000>;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <500000>;
+				};
 			};
 
 			ldo_3: LDO_REG3 {
 				regulator-name = "ldo3";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3400000>;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <500000>;
+				};
 			};
 
 			ldo_4: LDO_REG4 {
 				regulator-name = "ldo4";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3400000>;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <500000>;
+				};
 			};
 
 			/* dldo */
@@ -439,18 +527,33 @@
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3400000>;
 				regulator-boot-on;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <500000>;
+				};
 			};
 
 			ldo_6: LDO_REG6 {
 				regulator-name = "ldo6";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3400000>;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <500000>;
+				};
 			};
 
 			ldo_7: LDO_REG7 {
 				regulator-name = "ldo7";
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <3400000>;
+
+				regulator-state-mem {
+					regulator-off-in-suspend;
+					regulator-suspend-microvolt = <500000>;
+				};
 			};
 
 			ldo_8: LDO_REG8 {
@@ -737,4 +840,13 @@
 
 &sound_hdmi {
 	status = "okay";
+};
+
+&sound_codec {
+	status = "okay";
+	simple-audio-card,name = "snd-es8326";
+	spacemit,mclk-fs = <64>;
+	simple-audio-card,codec {
+		sound-dai = <&es8326>;
+	};
 };
