@@ -17,6 +17,7 @@
 #include <linux/platform_device.h>
 #include <linux/module.h>
 #include <linux/irqdomain.h>
+#include <linux/pm_wakeirq.h>
 
 #define GPLR		0x0
 #define GPDR		0xc
@@ -391,6 +392,11 @@ static int k1x_gpio_probe(struct platform_device *pdev)
 		ret = -ENOENT;
 		goto err;
 	}
+
+#ifdef CONFIG_PM
+	dev_pm_set_wake_irq(&pdev->dev, irq);
+	device_init_wakeup(&pdev->dev, true);
+#endif
 
 	gpiochip_add(&k1x_chip->chip);
 

@@ -10,7 +10,7 @@
 #include "k1-x-hdmi.dtsi"
 
 / {
-	model = "k1-x_MUSE-Book";
+	model = "M1-MUSE-BOOK";
 	modules_usrload = "8852be";
 
 	cpus: cpus {
@@ -139,6 +139,21 @@
 		compatible = "spacemit,k1x-lid";
 		scan-interval-ms = <1000>;
 		lid-gpios     = <&gpio 74 0>;
+	};
+
+	rf_pwrseq: rf-pwrseq {
+		compatible = "spacemit,rf-pwrseq";
+		status = "okay";
+
+		wlan_pwrseq: wlan-pwrseq {
+			compatible = "spacemit,wlan-pwrseq";
+			regon-gpios     = <&gpio 76 0>;
+		};
+
+		bt_pwrseq: bt-pwrseq {
+			compatible = "spacemit,bt-pwrseq";
+			reset-gpios     = <&gpio 78 0>;
+		};
 	};
 };
 
@@ -537,6 +552,8 @@
 		&range PRI_TCK  1 (MUX_MODE1 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 		&range PRI_TDO  1 (MUX_MODE1 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_74  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
+		&range GPIO_76  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_3V_DS4)
+		&range GPIO_78  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_3V_DS4)
 		&range GPIO_80  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_3V_DS4)
 		&range GPIO_81  3 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_90  1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
@@ -565,6 +582,8 @@
 		&pinctrl 63  GPIO_63  5
 		&pinctrl 70  PRI_TDI  4
 		&pinctrl 74  GPIO_74  1
+		&pinctrl 76  GPIO_76  1
+		&pinctrl 78  GPIO_78  1
 		&pinctrl 80  GPIO_80  4
 		&pinctrl 90  GPIO_90  3
 		&pinctrl 96  DVL0     2
@@ -744,8 +763,8 @@
 &pwm_bl {
 	pwms = <&pwm14 2000>;
 	brightness-levels = <
-		0   52  52  53  54  55  56  56  57  58  59  60  60  61  62  63
-		64  64  65  66  67  68  68  69  70  71  72  72  73  74  75  76
+		0   64  64  64  64  65  65  65  65  66  66  66  66  67  67  68
+		68  69  69  70  70  71  71  72  72  73  73  74  74  75  75  76
 		76  77  78  79  80  80  81  82  83  84  84  85  86  87  88  88
 		89  90  91  92  92  93  94  95  96  96  97  98  99  100 100 101
 		102 103 104 104 105 106 107 108 108 109 110 111 112 112 113 114
