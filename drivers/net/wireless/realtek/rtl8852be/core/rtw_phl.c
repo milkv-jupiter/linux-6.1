@@ -1995,8 +1995,10 @@ void rtw_hw_iface_deinit(_adapter *adapter)
 #endif
 	if (adapter->phl_role) {
 		_phl_role_free_prepare(adapter);
-		rtw_free_self_stainfo(adapter);
-		rtw_phl_wifi_role_free(GET_PHL_INFO(dvobj), adapter->phl_role->id);
+		if (dvobj && dvobj->phl) {
+			rtw_free_self_stainfo(adapter);
+			rtw_phl_wifi_role_free(GET_PHL_INFO(dvobj), adapter->phl_role->id);
+		}
 		adapter->phl_role = NULL;
 	}
 #if defined(CONFIG_RTW_IPS) || defined(CONFIG_RTW_LPS)

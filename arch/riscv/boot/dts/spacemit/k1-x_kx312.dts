@@ -4,6 +4,7 @@
 /dts-v1/;
 
 #include "k1-x.dtsi"
+#include "k1-x-efuse.dtsi"
 #include "k1-x_pinctrl.dtsi"
 #include "lcd/lcd_lt8911_edp_1920x1080.dtsi"
 #include "k1-x-lcd.dtsi"
@@ -794,20 +795,35 @@
 };
 
 &cpu_0 {
-	clst0-supply = <&dcdc_1>;
-	vin-supply-names = "clst0";
+	clst-supply = <&dcdc_1>;
 };
 
-&clst0_core_opp_table {
-	opp1600000000 {
-		opp-microvolt = <1050000>;
-	};
+&cpu_1 {
+	clst-supply = <&dcdc_1>;
 };
 
-&clst1_core_opp_table {
-	opp1600000000 {
-		opp-microvolt = <1050000>;
-	};
+&cpu_2 {
+	clst-supply = <&dcdc_1>;
+};
+
+&cpu_3 {
+	clst-supply = <&dcdc_1>;
+};
+
+&cpu_4 {
+	clst-supply = <&dcdc_1>;
+};
+
+&cpu_5 {
+	clst-supply = <&dcdc_1>;
+};
+
+&cpu_6 {
+	clst-supply = <&dcdc_1>;
+};
+
+&cpu_7 {
+	clst-supply = <&dcdc_1>;
 };
 
 &rcpu {
