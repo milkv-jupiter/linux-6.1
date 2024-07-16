@@ -6,6 +6,7 @@
 #include "k1-x.dtsi"
 #include "k1-x-efuse.dtsi"
 #include "k1-x_pinctrl.dtsi"
+#include "k1-x_opp_table.dtsi"
 
 / {
 	model = "spacemit k1-x MUSE-N1 board";
@@ -714,38 +715,6 @@
 		broken-flash-reset;
 		status = "okay";
 	};
-};
-
-&cpu_0 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_1 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_2 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_3 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_4 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_5 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_6 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_7 {
-	clst-supply = <&dcdc_1>;
 };
 
 &rcpu {

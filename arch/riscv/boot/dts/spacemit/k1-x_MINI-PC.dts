@@ -9,6 +9,7 @@
 #include "lcd/lcd_lt9711_dp_1920x1080.dtsi"
 #include "k1-x-lcd.dtsi"
 #include "k1-x-hdmi.dtsi"
+#include "k1-x_opp_table.dtsi"
 
 / {
 	model = "spacemit k1-x MINI-PC board";
@@ -807,38 +808,6 @@
 		broken-flash-reset;
 		status = "okay";
 	};
-};
-
-&cpu_0 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_1 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_2 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_3 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_4 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_5 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_6 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_7 {
-	clst-supply = <&dcdc_1>;
 };
 
 &rcpu {

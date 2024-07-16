@@ -36,9 +36,15 @@ of_hotplug_cooling_register(struct cpufreq_policy *policy);
 
 #define TURBO_FREQUENCY		(1600000000)
 #define STABLE_FREQUENCY	(1200000000)
-#define FILTER_POINTS		(140)
+
+#define FILTER_POINTS_0		(135)
+#define FILTER_POINTS_1		(142)
+
 #define FREQ_TABLE_0		(0)
 #define FREQ_TABLE_1		(1)
+#define FREQ_TABLE_2		(2)
+
+#define PRODUCT_ID_M1		(0x36070000)
 
 static int spacemit_policy_notifier(struct notifier_block *nb,
                                   unsigned long event, void *data)
@@ -390,7 +396,9 @@ static int spacemit_dt_cpufreq_pre_probe(struct platform_device *pdev)
 {
 	int cpu;
 	struct device_node *cpus;
+	struct device_node *product_id, *wafer_id;
 	u32 prop = 0;
+	u32 product_prop, wafer_prop;
 
 	if (strncmp(pdev->name, "cpufreq-dt", 10) != 0)
 		return 0;
@@ -400,8 +408,29 @@ static int spacemit_dt_cpufreq_pre_probe(struct platform_device *pdev)
 		pr_info("Spacemit Platform with no 'svt-dro' in DTS, using defualt frequency Table0\n");
 	}
 
-	for_each_possible_cpu(cpu) {
-		spacemit_dt_cpufreq_pre_early_init(&pdev->dev, cpu, prop >= FILTER_POINTS ? FREQ_TABLE_1 : FREQ_TABLE_0);
+	product_id = of_find_node_by_path("/");
+	if (!product_id || of_property_read_u32(product_id, "product-id", &product_prop)) {
+		pr_info("Spacemit Platform with no 'product-id' in DTS\n");
+	}
+
+	wafer_id = of_find_node_by_path("/");
+	if (!wafer_id || of_property_read_u32(product_id, "wafer-id", &wafer_prop)) {
+		pr_info("Spacemit Platform with no 'product-id' in DTS\n");
+	}
+
+	if ((wafer_prop << 16 | product_prop) == PRODUCT_ID_M1) {
+		for_each_possible_cpu(cpu) {
+			if (prop <= FILTER_POINTS_0)
+				spacemit_dt_cpufreq_pre_early_init(&pdev->dev, cpu, FREQ_TABLE_0);
+			else if (prop <= FILTER_POINTS_1)
+				spacemit_dt_cpufreq_pre_early_init(&pdev->dev, cpu, FREQ_TABLE_1);
+			else
+				spacemit_dt_cpufreq_pre_early_init(&pdev->dev, cpu, FREQ_TABLE_2);
+		}
+	} else {
+		for_each_possible_cpu(cpu) {
+			spacemit_dt_cpufreq_pre_early_init(&pdev->dev, cpu, FREQ_TABLE_0);
+		}
 	}
 
 	return 0;

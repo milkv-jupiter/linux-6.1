@@ -9,6 +9,7 @@
 #include "lcd/lcd_lt8911_edp_1920x1200.dtsi"
 #include "k1-x-lcd.dtsi"
 #include "k1-x-hdmi.dtsi"
+#include "k1-x_opp_table.dtsi"
 
 / {
 	model = "spacemit k1-x hs450 board";

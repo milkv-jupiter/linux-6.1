@@ -10,6 +10,7 @@
 #include "k1-x-hdmi.dtsi"
 #include "k1-x-lcd.dtsi"
 #include "k1-x-camera-sdk.dtsi"
+#include "k1-x_opp_table.dtsi"
 
 / {
 	model = "Milk-V Jupiter";
@@ -1011,38 +1012,6 @@
 
 &vi {
 	power-domains = <&power K1X_PMU_ISP_PWR_DOMAIN>;
-};
-
-&cpu_0 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_1 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_2 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_3 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_4 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_5 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_6 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_7 {
-	clst-supply = <&dcdc_1>;
 };
 
 &rcpu {

@@ -45,6 +45,9 @@
 /* gpio */
 #define WAKEUP_SOURCE_WAKEUP_2	2
 
+/* usb & others */
+#define WAKEUP_SOURCE_WAKEUP_5	5
+
 #define PM_QOS_BLOCK_C1		0x0 /* core wfi */
 #define PM_QOS_BLOCK_C2		0x2 /* core power off */
 #define PM_QOS_BLOCK_M2		0x6 /* core l2 off */
@@ -816,6 +819,11 @@ static int acpr_per_suspend(void)
 	/* enable gpio wakeup */
 	regmap_read(gpmu->regmap[MPMU_REGMAP_INDEX], MPMU_AWUCRM_REG, &apcr_per);
 	apcr_per |= (1 << WAKEUP_SOURCE_WAKEUP_2);
+	regmap_write(gpmu->regmap[MPMU_REGMAP_INDEX], MPMU_AWUCRM_REG, apcr_per);
+
+	/* enable usb/rcpu/ap2audio */
+	regmap_read(gpmu->regmap[MPMU_REGMAP_INDEX], MPMU_AWUCRM_REG, &apcr_per);
+	apcr_per |= (1 << WAKEUP_SOURCE_WAKEUP_5);
 	regmap_write(gpmu->regmap[MPMU_REGMAP_INDEX], MPMU_AWUCRM_REG, apcr_per);
 
 	return 0;

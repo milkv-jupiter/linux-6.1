@@ -9,6 +9,7 @@
 #include "lcd/lcd_lt8911_edp_1920x1080.dtsi"
 #include "k1-x-lcd.dtsi"
 #include "k1-x-hdmi.dtsi"
+#include "k1-x_opp_table.dtsi"
 
 / {
 	model = "M1-MUSE-BOOK";
@@ -248,7 +249,7 @@
 		#size-cells = <1>;
 
 		power-domains = <&power K1X_PMU_DUMMY_PWR_DOMAIN>;
-		status = "disabled";
+		status = "okay";
 
 		mac_address0: mac_address0@0 {
 			reg = <0x0 6>;
@@ -782,38 +783,6 @@
 	default-brightness-level = <128>;
 
 	status = "okay";
-};
-
-&cpu_0 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_1 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_2 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_3 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_4 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_5 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_6 {
-	clst-supply = <&dcdc_1>;
-};
-
-&cpu_7 {
-	clst-supply = <&dcdc_1>;
 };
 
 &rcpu {
