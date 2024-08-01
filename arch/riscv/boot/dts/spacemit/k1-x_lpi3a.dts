@@ -15,7 +15,7 @@
 
 / {
 	model = "SiPEED LPi3A Board";
-	modules_usrload = "aic8800_bsp", "aic8800_fdrv", "aic8800_btlpm";
+	modules_usrload = "aic8800_bsp,aic8800_fdrv,aic8800_btlpm";
 
 	cpus: cpus {
 		#address-cells = <1>;
@@ -145,12 +145,12 @@
 		//vdd_voltage = <3300000>;
 		io-supply = <&dcdc_3>;
 		io_voltage = <1800000>;
-		pwr-gpios  = <&ioexp1 4 0>;
+		pwr-gpios  = <&ioexp1 6 0>;  //dummy
 		status = "okay";
 
 		wlan_pwrseq: wlan-pwrseq {
 			compatible = "spacemit,wlan-pwrseq";
-			//regon-gpios     = <&ioexp1 4 0>;
+			regon-gpios     = <&ioexp1 4 0>; //must
 			interrupt-parent = <&pinctrl>;
 			interrupts = <268>;
 			pinctrl-names = "default";
@@ -377,13 +377,14 @@
 	status = "okay";
 
 	touch@14 {
-		#gpio-cells = <2>;
 		compatible = "goodix,gt9271";
 		reg = <0x14>;
 
 		reset-gpios = <&ioexp2 0 GPIO_ACTIVE_HIGH>;
 		irq-gpios = <&gpio 74 GPIO_ACTIVE_HIGH>;
 		irq-flags = <2>;
+		interrupt-parent = <&gpio>;
+		interrupts = <74 2>;
 		AVDD28-supply = <&reg_tp_pwr_en>;
 
 		touchscreen-max-id = <11>;
@@ -783,7 +784,7 @@
 	pinctrl-0 = <&pinctrl_mmc2>;
 	bus-width = <4>;
 	non-removable;
-	vqmmc-supply = <&dcdc_3>;
+	//vqmmc-supply = <&dcdc_3>;
 	no-mmc;
 	no-sd;
 	keep-power-in-suspend;
@@ -803,7 +804,7 @@
 			)>;
 	spacemit,rx_dline_reg = <0x0>;
 	spacemit,rx_tuning_limit = <50>;
-	spacemit,sdh-freq = <375000000>;
+	spacemit,sdh-freq = <102400000>;
 	status = "okay";
 };
 
@@ -915,12 +916,12 @@
 	/*spacemit,udc-mode = <MV_USB_MODE_OTG>;
 	spacemit,extern-attr = <MV_USB_HAS_VBUS_IDPIN_DETECTION>;*/
 	spacemit,udc-mode = <MV_USB_MODE_UDC>;
-	status = "disabled";
+	status = "okay";
 };
 
 &ehci {
         spacemit,udc-mode = <MV_USB_MODE_HOST>;
-        status = "okay";
+        status = "disabled";
 };
 
 
@@ -1067,7 +1068,7 @@
 	status = "disabled";
 };
 &csiphy2 {
-
+	spacemit,bifmode-enable;
 	status = "okay";
 };
 

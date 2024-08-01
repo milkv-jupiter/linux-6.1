@@ -672,12 +672,14 @@ static int sbs_get_battery_property(struct i2c_client *client,
 				chip->poll_time = 0;
 			}
 		} else if (psp == POWER_SUPPLY_PROP_CAPACITY) {
-			/* Check if the battery is fully charged */
+			/* Check if the battery is fully charged or nearly full and not charging */
 			union power_supply_propval status_val;
 			int status_index = sbs_get_property_index(client, POWER_SUPPLY_PROP_STATUS);
 			if (status_index >= 0) {
 				sbs_get_battery_property(client, status_index, POWER_SUPPLY_PROP_STATUS, &status_val);
 				if (status_val.intval == POWER_SUPPLY_STATUS_FULL) {
+					val->intval = 100;
+				} else if (ret >= 98 && status_val.intval == POWER_SUPPLY_STATUS_NOT_CHARGING) {
 					val->intval = 100;
 				} else {
 					val->intval = min(ret, 100);
@@ -702,6 +704,7 @@ static int sbs_get_battery_property(struct i2c_client *client,
 
 	return 0;
 }
+
 
 static const char *sbs_get_constant_string(struct sbs_info *chip,
 			enum power_supply_property psp)

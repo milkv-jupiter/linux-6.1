@@ -724,6 +724,7 @@
 			SDHCI_QUIRK2_BROKEN_PHY_MODULE
 			)>;
 	spacemit,rx_dline_reg = <0x0>;
+	spacemit,rx_tuning_freq = <1600000>;
 	spacemit,rx_tuning_limit = <50>;
 	spacemit,sdh-freq = <375000000>;
 	status = "okay";
@@ -767,8 +768,8 @@
 
 	clk-tuning-enable;
 	clk-tuning-by-delayline;
-	tx-phase = <60>;
-	rx-phase = <73>;
+	tx-phase = <77>;
+	rx-phase = <88>;
 
 	nvmem-cells = <&mac_address0>;
 	nvmem-cell-names = "mac-address";
@@ -808,8 +809,8 @@
 
 	clk-tuning-enable;
 	clk-tuning-by-delayline;
-	tx-phase = <90>;
-	rx-phase = <73>;
+	tx-phase = <83>;
+	rx-phase = <101>;
 	nvmem-cells = <&mac_address1>;
 	nvmem-cell-names = "mac-address";
 
@@ -984,7 +985,7 @@
 	status = "disabled";
 };
 &csiphy2 {
-
+	spacemit,bifmode-enable;
 	status = "okay";
 };
 
