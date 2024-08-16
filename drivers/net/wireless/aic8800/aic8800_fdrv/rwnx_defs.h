@@ -706,7 +706,7 @@ struct rwnx_hw {
 
 #ifdef CONFIG_SCHED_SCAN
     bool is_sched_scan;
-#endif//CONFIG_SCHED_SCAN 
+#endif//CONFIG_SCHED_SCAN
 };
 
 u8 *rwnx_build_bcn(struct rwnx_bcn *bcn, struct cfg80211_beacon_data *new);

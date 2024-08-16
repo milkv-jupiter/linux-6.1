@@ -1389,4 +1389,12 @@ config TOUCHSCREEN_ZINITIX
 	  To compile this driver as a module, choose M here: the
 	  module will be called zinitix.
 
+config TOUCHSCREEN_CHIPONE_TDDI
+	tristate "Chipone-tddi touchscreen support"
+	depends on SPI
+	help
+	  Say Y here if you have a touchscreen using Chipone-tddi.
+
+	  If unsure, say N.
+
 endif

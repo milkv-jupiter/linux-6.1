@@ -28,6 +28,7 @@
 		serial6 = &uart7;
 		serial7 = &uart8;
 		serial8 = &uart9;
+		serial9 = &r_uart1;
 		mmc0 = &sdhci0;
 		mmc1 = &sdhci1;
 		mmc2 = &sdhci2;
@@ -740,6 +741,23 @@
 			status = "ok";
 		};
 
+		r_uart1: r_uart1@c088d000 {
+			compatible = "spacemit,rcpu-pxa-uart";
+			reg = <0x0 0xc088d000 0x0 0x100>;
+			clocks = <&ccu CLK_RCPU_UART1>, <&ccu CLK_SLOW_UART>;
+			clock-names = "func", "gate";
+			resets = <&reset RESET_RCPU_UART1>;
+			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
+			clk,pm-runtime,no-sleep;
+			cpuidle,pm-runtime,sleep;
+			rcpu-uart;
+			interconnects = <&dram_range4>;
+			interconnect-names = "dma-mem";
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			status = "ok";
+		};
+
 		uart2: uart@d4017100 {
 			compatible = "spacemit,pxa-uart";
 			reg = <0x0 0xd4017100 0x0 0x100>;
@@ -1001,6 +1019,7 @@
 			reg = <0x0 0xd401c000 0x0 0x30>;
 			k1x,ssp-id = <3>;
 			k1x,ssp-clock-rate = <26000000>;
+			k1x,ssp-disable-dma;
 			dmas = <&pdma0 17 1
 				&pdma0 16 1>;
 			dma-names = "rx", "tx";
@@ -1701,7 +1720,8 @@
 
 		otg: otg@c0900100 {
 			compatible = "spacemit,mv-otg";
-			reg = <0x0 0xc0900100 0x0 0x4000>;
+			reg = <0x0 0xc0900100 0x0 0x4000>,
+				  <0x0 0xd428287c 0x0 0x4>;
 			interrupts = <105>;
 			interrupt-parent = <&intc>;
 			spacemit,otg-name = "mv-otg";
@@ -1709,7 +1729,6 @@
 			clocks = <&ccu CLK_USB_AXI>;
 			resets = <&reset RESET_USB_AXI>;
 			usb-phy = <&usbphy>;
-			extcon = <&extcon>;
 			status = "disabled";
 		};
 
@@ -1757,13 +1776,43 @@
 			status = "disabled";
 		};
 
+		otg1: otg1@c0980100 {
+			compatible = "spacemit,mv-otg";
+			reg = <0x0 0xc0980100 0x0 0x4000>,
+				  <0x0 0xd4282bc4 0x0 0x4>;
+			interrupts = <118>;
+			interrupt-parent = <&intc>;
+			spacemit,otg-name = "mv-otg1";
+			spacemit,otg-force-a-bus-req;
+			clocks = <&ccu CLK_USB_P1>;
+			resets = <&reset RESET_USBP1_AXI>;
+			usb-phy = <&usbphy1>;
+			status = "disabled";
+		};
+
+		udc1: udc1@c0980100 {
+			compatible = "spacemit,mv-udc";
+			reg = <0x0 0xc0980100 0x0 0x4000>;
+			interrupts = <118>;
+			interrupt-parent = <&intc>;
+			spacemit,udc-name = "mv-udc1";
+			spacemit,otg-force-a-bus-req;
+			resets = <&reset RESET_USBP1_AXI>;
+			clocks = <&ccu CLK_USB_P1>;
+			usb-phy = <&usbphy1>;
+			usb-otg = <&otg1>;
+			interconnects = <&dram_range0>;
+			interconnect-names = "dma-mem";
+			status = "disabled";
+		};
+
 		ehci1: ehci1@c0980100 {
 			compatible = "spacemit,mv-ehci";
 			reg = <0x0 0xc0980100 0x0 0x4000>,
 				  <0x0 0xd4282bc4 0x0 0x4>;
 			interrupts = <118>,<148>;
 			interrupt-parent = <&intc>;
-			spacemit,ehci-name = "mv-ehci";
+			spacemit,ehci-name = "mv-ehci1";
 			spacemit,otg-force-a-bus-req;
 			resets = <&reset RESET_USBP1_AXI>;
 			clocks = <&ccu CLK_USB_P1>;
@@ -1772,6 +1821,7 @@
 			regulator,pm-runtime,no-sleep;
 			cpuidle,pm-runtime,sleep;
 			usb-phy = <&usbphy1>;
+			usb-otg = <&otg1>;
 			interconnects = <&dram_range0>;
 			interconnect-names = "dma-mem";
 			status = "disabled";
