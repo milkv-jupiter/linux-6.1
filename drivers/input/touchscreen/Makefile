@@ -120,3 +120,4 @@ obj-$(CONFIG_TOUCHSCREEN_IQS5XX)	+= iqs5xx.o
 obj-$(CONFIG_TOUCHSCREEN_ZINITIX)	+= zinitix.o
 
 obj-$(CONFIG_TOUCHSCREEN_CHIPONE_TDDI)	+= chipone-tddi/
+obj-y += chsc5xxx/

@@ -560,7 +560,7 @@
 
 		pinctrl: pinctrl@d401e000 {
 			compatible = "pinconf-single-aib";
-			reg = <0x0 0xd401e000 0x0 0x400>,
+			reg = <0x0 0xd401e000 0x0 0x250>,
 				<0x0 0xd4019800 0x0 0x10>;
 			#address-cells = <1>;
 			#size-cells = <1>;
@@ -1317,6 +1317,37 @@
                         status = "disabled";
                 };
 
+		ri2c0: ri2c@c0887000 {
+			compatible = "spacemit,k1x-i2c-rcpu";
+			spacemit,adapter-id = <9>;
+			reg = <0x0 0xc0887000 0x0 0x38>;
+			/* usually i2c client has only 1 reg field */
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clocks = <&ccu CLK_RCPU_I2C0>;
+			resets = <&reset RESET_RCPU_I2C0>;
+			/*
+			dmas = <&pdma0 DMA_I2C0_RX 1
+				&pdma0 DMA_I2C0_TX 1>;
+			dma-names = "rx", "tx";
+			*/
+			rcpu-i2c;
+			spacemit,dma-disable;
+			/* spacemit,i2c-fast-mode; */
+			/* spacemit,i2c-high-mode; */
+			spacemit,i2c-master-code = /bits/ 8 <0x0e>;
+			spacemit,i2c-clk-rate = <32000000>;
+			spacemit,i2c-lcr = <0x82c469f>;
+			spacemit,i2c-wcr = <0x142a>;
+			/* apb clock: 26MHz or 52MHz */
+			spacemit,apb_clock = <52000000>;
+                        power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
+                        cpuidle,pm-runtime,sleep;
+			interconnects = <&dram_range4>;
+			interconnect-names = "dma-mem";
+			status = "okay";
+		};
+
 		pwm0: pwm@d401a000 {
 			compatible = "spacemit,k1x-pwm";
 			reg = <0x0 0xd401a000 0x0 0x10>;
@@ -1528,6 +1559,27 @@
 			status = "disabled";
 		};
 
+		ircrx: irc-rx@d4017f00 {
+			compatible = "spacemit,k1x-irc";
+			reg = <0x0 0xd4017f00 0x0 0x100>;
+			interrupts = <69>;
+			interrupt-parent = <&intc>;
+			clocks = <&ccu CLK_IR>;
+			resets = <&reset RESET_IR>;
+			clock-frequency = <102400000>;
+			status = "disabled";
+		};
+
+		r_ircrx: irc-rx@c088e000 {
+			compatible = "spacemit,k1x-rirc";
+			reg = <0x0 0xc088e000 0x0 0x100>;
+			clocks = <&ccu CLK_RCPU_IR>;
+			resets = <&reset RESET_RCPU_IR>;
+			clock-frequency = <30720000>;
+			rcpu-ir;
+			status = "disabled";
+		};
+
 		timer0: timer@d4014000 {
 			compatible = "spacemit,soc-timer";
 			reg = <0x0 0xd4014000 0x0 0xc8>;
@@ -1610,8 +1662,8 @@
 			status = "disabled";
 		};
 
-		flexcan1: fdcan@c0870000 {
-			compatible = "spacemit,k1x-flexcan";
+		r_flexcan: fdcan@c0870000 {
+			compatible = "spacemit,k1x-r-flexcan";
 			reg = <0x0 0xc0870000 0x0 0x4000>;
 			interrupt-parent = <&intc>;
 			clock-frequency = <20000000>;
@@ -1728,6 +1780,9 @@
 			spacemit,otg-force-a-bus-req;
 			clocks = <&ccu CLK_USB_AXI>;
 			resets = <&reset RESET_USB_AXI>;
+			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
+			clk,pm-runtime,no-sleep;
+			cpuidle,pm-runtime,sleep;
 			usb-phy = <&usbphy>;
 			status = "disabled";
 		};
@@ -1760,7 +1815,6 @@
 			clocks = <&ccu CLK_USB_AXI>;
 			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
 			clk,pm-runtime,no-sleep;
-			regulator,pm-runtime,no-sleep;
 			cpuidle,pm-runtime,sleep;
 			usb-phy = <&usbphy>;
 			usb-otg = <&otg>;
@@ -1786,6 +1840,9 @@
 			spacemit,otg-force-a-bus-req;
 			clocks = <&ccu CLK_USB_P1>;
 			resets = <&reset RESET_USBP1_AXI>;
+			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
+			clk,pm-runtime,no-sleep;
+			cpuidle,pm-runtime,sleep;
 			usb-phy = <&usbphy1>;
 			status = "disabled";
 		};
@@ -1818,7 +1875,6 @@
 			clocks = <&ccu CLK_USB_P1>;
 			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
 			clk,pm-runtime,no-sleep;
-			regulator,pm-runtime,no-sleep;
 			cpuidle,pm-runtime,sleep;
 			usb-phy = <&usbphy1>;
 			usb-otg = <&otg1>;
@@ -1848,6 +1904,9 @@
 
 		usb3hub: usb3hub@0 {
 			compatible = "spacemit,usb3-hub";
+			power-domains = <&power K1X_PMU_DUMMY_PWR_DOMAIN>;
+			clk,pm-runtime,no-sleep;
+			cpuidle,pm-runtime,sleep;
 			status = "disabled";
 		};
 
@@ -1860,6 +1919,9 @@
 			reset-names = "ctl_rst";
 			clocks = <&ccu CLK_USB30>;
 			clock-names = "usbdrd30";
+			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
+			clk,pm-runtime,no-sleep;
+			cpuidle,pm-runtime,sleep;
 			phys = <&combphy PHY_TYPE_USB3>;
 			phy-names = "usb3-phy";
 			usb-phy = <&usb2phy>;
